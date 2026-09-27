@@ -1,0 +1,1 @@
+"""client_ui — нативный Qt-клиент (Material You / Win98, без WebEngine)."""

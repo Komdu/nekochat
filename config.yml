@@ -1,0 +1,7 @@
+# Метаданные Nekochat-сервера (отдаёт /api/server-info: адресник клиента, лендинг)
+name: Nekochat
+description: ""
+# version: "0.9.0"                # показывается на лендинге и в /api/server-info
+# download_url: ""                # внешняя ссылка на релиз (например GitHub);
+#                                 # если пусто — кнопка «Скачать» ведёт на /download
+# download_path: dist/Nekochat.exe  # файл сборки, который раздаёт /download (путь на сервере)

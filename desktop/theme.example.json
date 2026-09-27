@@ -1,0 +1,17 @@
+{
+  "name": "Мой пример",
+  "mode": "dark",
+  "accent": "#00b8a9",
+  "colors": {
+    "desk": "#0b0f14",
+    "panel": "#151c24",
+    "panel_hover": "#1f2937",
+    "text1": "#ecf3fa",
+    "muted": "#9fb1c1",
+    "primary": "#22d3ee",
+    "on_primary": "#04252e",
+    "mine": "#0e7490",
+    "mine_sender": "#cffafe",
+    "surface_high": "#1f2937"
+  }
+}

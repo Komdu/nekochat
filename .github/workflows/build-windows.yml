@@ -1,0 +1,32 @@
+name: build-windows-client
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements-client.txt
+
+      - name: Build exe
+        run: pyinstaller --noconfirm --onefile --name Nekochat ^
+          --add-data "icon.png;." ^
+          --hidden-import PySide6.QtWebSockets ^
+          client_app.py
+        shell: cmd
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nekochat-windows
+          path: dist/Nekochat.exe

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>nekochat — чат-клиент и свой сервер</title>
+<meta name="description" content="Nekochat: скачиваемый клиент с адресником серверов и свой собственный лёгкий сервер (SQLite, один процесс). Тема Win98 или Material You." />
+<link rel="icon" type="image/png" href="/icon.png" />
+<link rel="stylesheet" href="/fonts/fonts.css" />
+<style>
+  :root {
+    --bg: #0f0d13;
+    --bg2: #17131f;
+    --card: #1d1927;
+    --card2: #231e2f;
+    --line: #2d2740;
+    --text: #e6e0e9;
+    --muted: #a49eb3;
+    --primary: #d0bcff;
+    --on-primary: #381e72;
+    --secondary: #ccc2dc;
+    --ok: #7ee2a8;
+    --warn: #ffd8a8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    background:
+      radial-gradient(900px 480px at 85% -10%, rgba(208, 188, 255, .18), transparent 60%),
+      radial-gradient(700px 420px at -10% 30%, rgba(255, 160, 214, .10), transparent 60%),
+      linear-gradient(180deg, var(--bg), var(--bg2) 70%);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ---------- top bar ---------- */
+  header.top {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 28px; max-width: 1100px; margin: 0 auto;
+  }
+  header.top .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  header.top .logo img { width: 28px; height: 28px; border-radius: 30%; }
+  header.top nav { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+
+  /* ---------- hero ---------- */
+  .hero { max-width: 1100px; margin: 34px auto 0; padding: 0 28px; display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; }
+  @media (max-width: 880px) { .hero { grid-template-columns: 1fr; } .mock { display: none; } }
+  .hero h1 { font-size: 42px; line-height: 1.12; font-weight: 700; letter-spacing: -.5px; }
+  .hero h1 span { color: var(--primary); }
+  .hero p.sub { font-size: 17px; color: var(--muted); margin: 14px 0 24px; max-width: 520px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  button.dl {
+    font-family: inherit; font-size: 16px; font-weight: 600;
+    background: var(--primary); color: var(--on-primary);
+    border: none; border-radius: 999px; padding: 14px 26px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 10px;
+    box-shadow: 0 6px 18px rgba(208, 188, 255, .25);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  button.dl:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(208, 188, 255, .35); }
+  a.webbtn {
+    font-size: 16px; font-weight: 600; border-radius: 999px; padding: 14px 24px;
+    border: 1px solid var(--line); color: var(--text); background: rgba(255,255,255,.02);
+  }
+  .meta { margin-top: 16px; font-size: 13px; color: var(--muted); }
+
+  /* ---------- window mock ---------- */
+  .mock { position: relative; }
+  .mock .win {
+    background: linear-gradient(180deg, var(--card), var(--card2));
+    border: 1px solid var(--line); border-radius: 20px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+  .mock .topbar { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .mock .topbar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .mock .topbar i:nth-child(1) { background: #ff5f57; } .mock .topbar i:nth-child(2) { background: #febc2e; } .mock .topbar i:nth-child(3) { background: #28c840; }
+  .mock .topbar b { font-size: 13px; margin-left: 8px; color: var(--muted); font-weight: 500; }
+  .mock .cols { display: grid; grid-template-columns: 130px 1fr; min-height: 300px; }
+  .mock .side { border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 8px; }
+  .swatch { width: 24px; height: 24px; border-radius: 50%; display: inline-block; border: 2px solid rgba(255,255,255,.25); }
+  .mock .side .swatches { display: flex; gap: 6px; padding: 6px 2px; }
+  .mock .side .item { font-size: 12px; color: var(--muted); padding: 6px 8px; border-radius: 10px; }
+  .mock .side .item.on { background: rgba(208,188,255,.14); color: var(--primary); }
+  .mock .chat { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .mock .bub { max-width: 80%; font-size: 13px; padding: 9px 13px; border-radius: 16px; }
+  .mock .bub.dm { background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; align-self: flex-end; }
+  .mock .bub.other { background: rgba(255,255,255,.06); border-bottom-left-radius: 4px; align-self: flex-start; }
+  .mock .bub.sys { align-self: center; font-size: 11px; color: var(--muted); background: none; }
+
+  /* ---------- features ---------- */
+  .cards { max-width: 1100px; margin: 70px auto 0; padding: 0 28px; }
+  .cards h2 { font-size: 26px; margin-bottom: 22px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px;
+  }
+  .card h3 { font-size: 16px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+  .card p { font-size: 14px; color: var(--muted); }
+  .card .ic { font-size: 22px; }
+
+  /* ---------- server howto ---------- */
+  .howto { max-width: 1100px; margin: 60px auto 0; padding: 0 28px; }
+  pre {
+    background: #0b0a10; border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; font-size: 13px; overflow-x: auto; margin-top: 14px;
+    font-family: 'Cascadia Code', Consolas, monospace; color: var(--secondary);
+  }
+  .howto ol { margin: 14px 0 0 20px; font-size: 15px; color: var(--muted); }
+  .howto ol li { margin-bottom: 8px; }
+  .howto code { background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+
+  footer { max-width: 1100px; margin: 70px auto 0; padding: 24px 28px 40px; border-top: 1px solid var(--line); display: flex; gap: 20px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+  footer nav { display: flex; gap: 16px; margin-left: auto; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo"><img src="/icon.png" alt="" /> nekochat</div>
+  <nav>
+    <a href="#features">Возможности</a>
+    <a href="#server">Свой сервер</a>
+    <a href="/docs">API</a>
+    <a href="/web/">Веб-версия</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div>
+    <h1>Чат в духе TeamSpeak:<br /><span>клиент</span> + <span>свой сервер</span></h1>
+    <p class="sub">
+      Скачиваемый нативный клиент с адресником серверов. Каждый может поднять свой
+      лёгкий сервер за 30 секунд — SQLite, один Python-процесс, без Docker и БД.
+      Темы оформления: <b>Win98</b> или <b>Material You</b>.
+    </p>
+    <div class="cta">
+      <button class="dl" id="dl-btn">⬇ Скачать для Windows</button>
+      <a class="webbtn" href="/web/">Открыть веб-версию</a>
+    </div>
+    <div class="meta" id="dl-meta">…</div>
+  </div>
+
+  <div class="mock">
+    <div class="win">
+      <div class="topbar"><i></i><i></i><i></i><b>nekochat — мой сервер</b></div>
+      <div class="cols">
+        <div class="side">
+          <div class="swatches">
+            <span class="swatch" style="background:#6750a4"></span>
+            <span class="swatch" style="background:#1565c0"></span>
+            <span class="swatch" style="background:#ad1457"></span>
+            <span class="swatch" style="background:#00695c"></span>
+          </div>
+          <div class="item on"># общий</div>
+          <div class="item"># игры</div>
+          <div class="item">@komdu</div>
+        </div>
+        <div class="chat">
+          <div class="bub sys">Сегодня</div>
+          <div class="bub other">поставил сервер одной командой 👍</div>
+          <div class="bub dm">да, python server.py — и всё</div>
+          <div class="bub other">глянь, Material You уже подхватился</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cards" id="features">
+  <h2>Что внутри</h2>
+  <div class="grid">
+    <div class="card"><h3><span class="ic">📚</span> Адресник</h3><p>Список своих и чужих серверов, статус «онлайн» прямо в списке, двойной клик — и ты в чате.</p></div>
+    <div class="card"><h3><span class="ic">🖥</span> Свой сервер</h3><p>Один файл: <code>python server.py --db data.db</code>. SQLite по умолчанию, PostgreSQL — если захочешь.</p></div>
+    <div class="card"><h3><span class="ic">🎨</span> Material You</h3><p>Акцент любого цвета — палитра строится автоматически. Или вернись в Win98: тоже тема.</p></div>
+    <div class="card"><h3><span class="ic">🎙</span> Голосовые звонки</h3><p>WebRTC, без серверного веса — сигналинг через WebSocket, медиа напрямую между участниками.</p></div>
+    <div class="card"><h3><span class="ic">🔌</span> Открытый API</h3><p>Кастомные клиенты: REST + WebSocket, документация в <a href="/docs">/docs</a> и <a href="/openapi.json">OpenAPI</a>.</p></div>
+    <div class="card"><h3><span class="ic">🔒</span> Лёгкий и приватный</h3><p>Никакой телеметрии. Чат-сервер принадлежит тому, кто его поднял.</p></div>
+  </div>
+</section>
+
+<section class="howto" id="server">
+  <h2>Поднять свой сервер — 30 секунд</h2>
+  <ol>
+    <li>Python 3.11+ → <code>pip install -r requirements.txt</code></li>
+    <li>Запусти: <code>python server.py --db data.db --host 0.0.0.0 --name "Мой сервер"</code></li>
+    <li>В клиенте: <b>Добавить сервер</b> → впиши адрес → готово. Сервер сам отдаёт клиентам имя и описание.</li>
+  </ol>
+  <pre>python server.py --db data.db --host 0.0.0.0 --port 9000 --name "Мой сервер"
+[nekochat] db=sqlite:///.../data.db listen=http://0.0.0.0:9000</pre>
+</section>
+
+<footer>
+  <div>nekochat · клиент + свой сервер</div>
+  <nav>
+    <a href="/api/server-info">server-info</a>
+    <a href="/docs">API-документы</a>
+    <a href="/web/">Веб-версия</a>
+  </nav>
+</footer>
+
+<script>
+  // Актуальная ссылка на скачивание и версия — с сервера (/api/server-info)
+  (function () {
+    var dl = document.getElementById('dl-btn');
+    var meta = document.getElementById('dl-meta');
+    fetch('/api/server-info')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (info) {
+        if (!info) throw new Error('no info');
+        var url = info.download_url || '/download';
+        var size = info.download_size ? ' · ' + info.download_size : '';
+        var name = info.name || 'nekochat';
+        if (dl) dl.onclick = function () { location.href = url; };
+        if (meta) meta.textContent = 'v' + (info.version || 'dev') + size + ' · ' + name +
+          (info.sqlite ? ' · SQLite-сервер онлайн' : '');
+      })
+      .catch(function () {
+        if (dl) dl.onclick = function () { location.href = '/download'; };
+        if (meta) meta.textContent = 'Скачать или открыть веб-версию';
+      });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nekochat Admin</title>
+<style>
+  :root {
+    --bg: #14161b;
+    --panel: #1d2027;
+    --panel2: #232733;
+    --line: #30364a;
+    --text: #dfe3ec;
+    --dim: #8a91a3;
+    --accent: #6c8cff;
+    --red: #ff5b6a;
+    --green: #4fd07c;
+    --amber: #f4b942;
+    --mono: "Consolas", "Menlo", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 "Segoe UI", Arial, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 18px; }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    letter-spacing: .3px;
+  }
+  .subtitle { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+  code.hash {
+    font-family: var(--mono);
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--amber);
+    user-select: all;
+  }
+
+  /* топбар */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--dim);
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .tab:hover { color: var(--text); border-color: #44507a; }
+  .tab.active {
+    color: #fff;
+    border-color: var(--accent);
+    background: #2a3352;
+  }
+  .logout {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--dim);
+    border-radius: 6px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .logout:hover { color: var(--red); border-color: var(--red); }
+
+  /* логин */
+  #login {
+    display: none;
+    max-width: 460px;
+    margin: 9vh auto 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 26px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.4);
+  }
+  #login h2 { margin: 0 0 6px; font-size: 17px; }
+  #login p { color: var(--dim); font-size: 13px; margin: 0 0 16px; }
+  #login input {
+    width: 100%;
+    padding: 11px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  #login button {
+    width: 100%;
+    padding: 11px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .err { color: var(--red); font-size: 13px; margin-bottom: 10px; min-height: 18px; }
+
+  /* карточки */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .card .n { font-size: 24px; font-weight: 700; }
+  .card .l { color: var(--dim); font-size: 12px; margin-top: 2px; }
+
+  /* таблицы */
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: middle; }
+  th { background: var(--panel2); color: var(--dim); font-weight: 600; white-space: nowrap; }
+  tr:hover td { background: #20242e; }
+  /* колонка действий всегда видна (липкая справа при горизонтальной прокрутке) */
+  th.actions, td.actions { position: sticky; right: 0; z-index: 1; }
+  th.actions { background: var(--panel2); }
+  td.actions { background: var(--panel); box-shadow: -8px 0 12px -10px rgba(0,0,0,.7); }
+  tr:hover td.actions { background: #232733; }
+  td.mono { font-family: var(--mono); font-size: 12px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.on { background: var(--green); }
+  .dot.off { background: #4c5160; }
+  .badge {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.ban { background: #3a1d22; color: var(--red); border: 1px solid #6b2c36; }
+  .badge.adminish { background: #243423; color: var(--green); border: 1px solid #2e5a3c; }
+
+  button.small {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 4px 9px;
+    font-size: 12px;
+    cursor: pointer;
+    margin: 1px;
+  }
+  button.small:hover { border-color: var(--accent); }
+  button.small.danger:hover { border-color: var(--red); color: var(--red); }
+  button.small:disabled { opacity: .45; cursor: default; }
+  button.del {
+    border-color: var(--red);
+    color: #ff8a94;
+    font-weight: 700;
+    background: #2a1519;
+  }
+  button.del:hover { background: #3a1d22; color: #ffb3ba; }
+
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .toolbar input, .toolbar select {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 7px 9px;
+    font-size: 13px;
+  }
+  .toolbar label { color: var(--dim); font-size: 13px; }
+  .msg-content { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #bfc6d6; }
+  .muted { color: var(--dim); }
+  #main { display: none; }
+  .spacer { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>🛠 Nekochat Admin</h1>
+      <div class="subtitle">Панель управления сервером</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center" id="sessionInfo"></div>
+  </div>
+
+  <div id="login">
+    <h2>Вход для администратора</h2>
+    <p>Введите хэш из консоли сервера. Хэш действует до перезапуска сервера.</p>
+    <div class="err" id="loginErr"></div>
+    <input id="hashInput" type="password" autocomplete="off" placeholder="хэш из консоли…" autofocus />
+    <button id="loginBtn">Войти</button>
+  </div>
+
+  <div id="main">
+    <div class="topbar">
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="overview">Обзор</div>
+        <div class="tab" data-tab="users">Пользователи</div>
+        <div class="tab" data-tab="messages">Сообщения</div>
+        <div class="tab" data-tab="rooms">Комнаты</div>
+      </div>
+      <button class="logout" id="logoutBtn">Выйти</button>
+    </div>
+
+    <div id="tab-overview">
+      <div class="cards" id="statCards"></div>
+    </div>
+
+    <div id="tab-users" style="display:none">
+      <div class="toolbar">
+        <input id="uQuery" placeholder="поиск: username / имя…" style="width:240px" />
+        <button class="small" id="uSearch">Поиск</button>
+        <span class="spacer"></span>
+        <span id="uButtons"></span>
+      </div>
+      <div style="overflow-x:auto"><table id="usersTable"></table></div>
+    </div>
+
+    <div id="tab-messages" style="display:none">
+      <div class="toolbar">
+        <label>Тип:</label>
+        <select id="mType">
+          <option value="room">Комнатные</option>
+          <option value="direct">Личные</option>
+        </select>
+        <label>user_id:</label>
+        <input id="mUserId" placeholder="—" style="width:90px" />
+        <label>room_id:</label>
+        <input id="mRoomId" placeholder="—" style="width:90px" />
+        <button class="small" id="mSearch">Показать</button>
+        <button class="small" id="mReload">Обновить</button>
+      </div>
+      <div style="overflow-x:auto"><table id="messagesTable"></table></div>
+    </div>
+
+    <div id="tab-rooms" style="display:none">
+      <div class="toolbar">
+        <button class="small" id="rReload">Обновить</button>
+      </div>
+      <div style="overflow-x:auto"><table id="roomsTable"></table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+
+async function api(path, opts = {}) {
+  const r = await fetch("/admin" + path, {
+    method: opts.method || "GET",
+    headers: opts.body ? { "Content-Type": "application/json" } : undefined,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (r.status === 401) { showLogin(); throw new Error("unauthorized"); }
+  if (!r.ok) {
+    let msg = "HTTP " + r.status;
+    try { const j = await r.json(); msg = j.detail || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function showLogin() {
+  $("main").style.display = "none";
+  $("login").style.display = "block";
+  $("hashInput").focus();
+}
+
+function showMain() {
+  $("login").style.display = "none";
+  $("main").style.display = "block";
+  $("sessionInfo").innerHTML = "";
+  loadTab(currentTab);
+}
+
+async function whoami() {
+  try { const a = await api("/auth"); return a.ok; } catch (e) { return false; }
+}
+
+// ---- tabs ----
+let currentTab = "overview";
+$("tabs").addEventListener("click", (e) => {
+  const t = e.target.closest(".tab");
+  if (!t) return;
+  document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+  t.classList.add("active");
+  currentTab = t.dataset.tab;
+  for (const id of ["tab-overview","tab-users","tab-messages","tab-rooms"])
+    $(id).style.display = id === "tab-" + currentTab ? "block" : "none";
+  loadTab(currentTab);
+});
+
+function loadTab(tab) {
+  if (tab === "overview") loadStats();
+  if (tab === "users") loadUsers();
+  if (tab === "messages") loadMessages();
+  if (tab === "rooms") loadRooms();
+}
+
+// ---- auth ----
+$("loginBtn").addEventListener("click", doLogin);
+$("hashInput").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+async function doLogin() {
+  $("loginErr").textContent = "";
+  try {
+    await api("/login", { method: "POST", body: { hash: $("hashInput").value.trim() } });
+    $("hashInput").value = "";
+    showMain();
+  } catch (e) {
+    $("loginErr").textContent = "Неверный хэш";
+  }
+}
+
+$("logoutBtn").addEventListener("click", async () => {
+  await api("/logout", { method: "POST" });
+  showLogin();
+});
+
+// ---- overview ----
+async function loadStats() {
+  const s = await api("/stats");
+  $("statCards").innerHTML = [
+    ["👤", s.users, "пользователей"],
+    ["🟢", s.online, "онлайн"],
+    ["🚫", s.banned, "заблокировано"],
+    ["💬", s.room_messages, "сообщений в комнатах"],
+    ["✉️", s.direct_messages, "личных сообщений"],
+    ["🏠", s.rooms, "комнат"],
+    ["🔌", s.ws_connections, "активных WS"],
+  ].map(([ic, n, l]) =>
+    `<div class="card"><div class="n">${ic} ${n}</div><div class="l">${l}</div></div>`
+  ).join("");
+}
+
+// ---- users ----
+$("uQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") loadUsers(); });
+$("uSearch").addEventListener("click", loadUsers);
+
+async function loadUsers() {
+  try {
+    const q = encodeURIComponent($("uQuery").value.trim());
+    const users = await api("/users?q=" + q);
+    const head = ["id","username","имя","статус","онлайн","сообщений / комнат","создан","действия"].map(h => `<th${h === "действия" ? ' class="actions"' : ""}>${h}</th>`).join("");
+    $("usersTable").innerHTML =
+      "<thead><tr>" + head + "</tr></thead><tbody>" +
+      (users.map((u) => {
+        const st = (u.stats ? `${u.stats.room_messages} / ${u.stats.direct_messages} / ${u.stats.rooms}` : "—");
+        return `<tr>
+        <td class="mono">${u.id}</td>
+        <td class="mono">${esc(u.username)}</td>
+        <td>${esc(u.display_name)}</td>
+        <td>${esc(u.status || "")} ${u.is_banned ? '<span class="badge ban">БАН</span>' : ""}</td>
+        <td><span class="dot ${u.is_online ? "on" : "off"}"></span>${u.is_online ? "онлайн" : "офлайн"}</td>
+        <td class="mono">${st}</td>
+        <td class="mono">${esc((u.created_at || "").slice(0, 10))}</td>
+        <td class="actions" nowrap>
+          <button class="small del" data-act="del" data-id="${u.id}">Удалить акк</button>
+          <button class="small" data-act="edit" data-id="${u.id}">ред.</button>
+          ${u.is_banned
+            ? `<button class="small" data-act="unban" data-id="${u.id}">разбан</button>`
+            : `<button class="small" data-act="ban" data-id="${u.id}">бан</button>`}
+          <button class="small" data-act="resetpw" data-id="${u.id}">пароль</button>
+        </td>
+      </tr>`;
+      }).join("") || '<tr><td colspan="8" class="muted">ничего не найдено</td></tr>') +
+      "</tbody>";
+  } catch (err) {
+    $("usersTable").innerHTML = '<tr><td colspan="8" class="muted">Ошибка загрузки: ' + esc(err.message) + "</td></tr>";
+  }
+}
+
+$("usersTable").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const id = b.dataset.id;
+  const act = b.dataset.act;
+  try {
+    if (act === "edit") {
+      const u = await api("/users/" + id);
+      const name = prompt("Имя (display_name):", u.display_name ?? "");
+      if (name === null) return;
+      const status = prompt("Статус:", u.status ?? "");
+      if (status === null) return;
+      const color = prompt("Цвет профиля (#RRGGBB, пусто — убрать):", u.profile_color ?? "");
+      if (color === null) return;
+      await api("/users/" + id + "/edit", { method: "POST", body: { display_name: name, status, profile_color: color } });
+    } else if (act === "ban") {
+      if (!confirm(`Заблокировать пользователя #${id}?`)) return;
+      await api(`/users/${id}/ban`, { method: "POST" });
+    } else if (act === "unban") {
+      await api(`/users/${id}/unban`, { method: "POST" });
+    } else if (act === "resetpw") {
+      const r = await api(`/users/${id}/reset-password`, { method: "POST" });
+      alert(`Новый пароль: ${r.temp_password}`);
+    } else if (act === "del") {
+      if (!confirm(`ВНИМАНИЕ!\nУдалить пользователя #${id} навсегда?\nУдалятся его сообщения, личные переписки и пустые комнаты.`)) return;
+      await api("/users/" + id, { method: "DELETE" });
+    }
+  } catch (err) { alert("Ошибка: " + err.message); }
+  loadUsers();
+});
+
+// ---- messages ----
+$("mSearch").addEventListener("click", loadMessages);
+$("mReload").addEventListener("click", loadMessages);
+$("mUserId").addEventListener("keydown", (e) => { if (e.key === "Enter") loadMessages(); });
+$("mRoomId").addEventListener("keydown", (e) => { if (e.key === "Enter") loadMessages(); });
+
+async function loadMessages() {
+  const type = $("mType").value;
+  const uid = $("mUserId").value.trim();
+  const rid = $("mRoomId").value.trim();
+  let path = type === "room" ? "/messages?" : "/direct-messages?";
+  if (uid) path += "user_id=" + encodeURIComponent(uid) + "&";
+  if (rid && type === "room") path += "room_id=" + encodeURIComponent(rid) + "&";
+  path += "limit=100";
+  const rows = await api(path);
+  const head = (type === "room"
+    ? ["id", "comната", "пользователь", "сообщение", "дата", ""]
+    : ["id", "диалог", "отправитель", "сообщение", "дата", ""]
+  ).map(h => `<th>${h}</th>`).join("");
+  $("messagesTable").innerHTML =
+    "<thead><tr>" + head + "</tr></thead><tbody>" +
+    (rows.map((m) => `<tr>
+        <td class="mono">${m.id}</td>
+        <td class="mono">${type === "room" ? m.room_id : m.conversation_id}</td>
+        <td class="mono">${m.user_id} · ${esc((m.user?.display_name || "?") + " (" + (m.user?.username || "?") + ")")}</td>
+        <td class="msg-content" title="${esc(m.content)}">${esc(m.content)}</td>
+        <td class="mono" nowrap>${esc((m.created_at || "").replace("T", " ").slice(5, 16))}</td>
+        <td><button class="small danger" data-del="${type === "room" ? "messages" : "direct-messages"}" data-id="${m.id}">🗑</button></td>
+      </tr>`).join("") || '<tr><td colspan="6" class="muted">нет сообщений</td></tr>') +
+    "</tbody>";
+}
+
+$("messagesTable").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-del]");
+  if (!b) return;
+  if (!confirm(`Удалить сообщение #${b.dataset.id}?`)) return;
+  try { await api(`/${b.dataset.del}/${b.dataset.id}`, { method: "DELETE" }); }
+  catch (err) { alert("Ошибка: " + err.message); }
+  loadMessages();
+});
+
+// ---- rooms ----
+$("rReload").addEventListener("click", loadRooms);
+
+async function loadRooms() {
+  const rows = await api("/rooms");
+  const head = ["id","название","создатель","участники","сообщений","дата","действия"].map(h => `<th>${h}</th>`).join("");
+  $("roomsTable").innerHTML =
+    "<thead><tr>" + head + "</tr></thead><tbody>" +
+    (rows.map((r) => `<tr>
+        <td class="mono">${r.id}</td>
+        <td>${esc(r.name)}</td>
+        <td class="mono">${r.created_by ?? "—"}</td>
+        <td>${r.member_count}</td>
+        <td>${r.message_count}</td>
+        <td class="mono">${esc((r.created_at || "").slice(0, 16).replace("T", " "))}</td>
+        <td><button class="small danger" data-rid="${r.id}">удалить</button></td>
+      </tr>`).join("") || '<tr><td colspan="7" class="muted">комнат нет</td></tr>') +
+    "</tbody>";
+}
+
+$("roomsTable").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-rid]");
+  if (!b) return;
+  if (!confirm(`Удалить комнату #${b.dataset.rid} со всеми сообщениями?`)) return;
+  try { await api("/rooms/" + b.dataset.rid, { method: "DELETE" }); }
+  catch (err) { alert("Ошибка: " + err.message); }
+  loadRooms();
+});
+
+// ---- boot ----
+(async () => {
+  if (await whoami()) showMain(); else showLogin();
+})();
+</script>
+</body>
+</html>

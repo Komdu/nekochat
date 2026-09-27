@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nekochat
+      POSTGRES_PASSWORD: nekochat
+      POSTGRES_DB: nekochat
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nekochat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://nekochat:nekochat@db:5432/nekochat
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please}
+      AVATARS_DIR: /data/avatars
+      # NATS-транспорт (Phase 1): креды для клиентов + моста
+      NATS_ENABLED: ${NATS_ENABLED:-true}
+      NATS_WS_USER: ${NATS_WS_USER:-nekochat}
+      NATS_WS_PASS: ${NATS_WS_PASS:-nekochat-phase1-change-me}
+    ports:
+      - "8000:8000"
+      - "8081:8081"
+    volumes:
+      - nekochat-avatars:/data/avatars
+
+volumes:
+  pgdata:
+  nekochat-avatars:
