@@ -457,171 +457,15 @@
       border-color: var(--title1); outline: 2px solid var(--title1); outline-offset: 0;
     }
 
-    /* ============================================================
-       МАКЕТ КЛИЕНТА: плоский чат во всю ширину, контурные пузыри
-       с хвостиком, поле ввода без рамки и нижняя панель
-       (участники | комнаты | меню). Список комнат и людей ->
-       выезжающая панель. Цвета живут в переменных, чтобы win98
-       остался ретро, а material был плоским.
-       ============================================================ */
-    :root {
-      --taskbar-h: 28px;
-      --chat-bg: #1a1a1a;  --bar-bg: #151515;
-      --bubble-bg: #212121; --bubble-border: #d8d8d8; --bubble-text: #f3f3f3;
-      --bubble-mine-bg: #2b2b2b; --bubble-mine-border: #f0f0f0;
-      --hairline: #383838;  --chip-active-bg: #2f2f2f; --chip-text: #dcdcdc;
-    }
-    html[data-theme="material"] { --taskbar-h: 0px; }
-    html[data-mode="light"] {
-      --chat-bg: #f4f4f4;  --bar-bg: #e9e9e9;
-      --bubble-bg: #ffffff; --bubble-border: #cfcfcf; --bubble-text: #1a1a1a;
-      --bubble-mine-bg: #efefef; --bubble-mine-border: #9a9a9a;
-      --hairline: #dcdcdc;  --chip-active-bg: #dcdcdc; --chip-text: #333333;
-    }
-    html[data-theme="win98"] {
-      --chat-bg: var(--face); --bar-bg: var(--face);
-      --bubble-bg: #ffffc1; --bubble-border: #808080; --bubble-text: #000000;
-      --bubble-mine-bg: #d4d0c8; --bubble-mine-border: #404040;
-      --hairline: #808080;  --chip-active-bg: #000080; --chip-text: #000000;
-    }
-    html[data-theme="material"] #taskbar { display: none; }
-    #app { height: calc(100vh - var(--taskbar-h)); }
-    .layout { height: calc(100vh - var(--taskbar-h)); position: relative; }
-    .chat { min-width: 0; background: var(--chat-bg); }
-
-    /* сайдбар -> выезжающая панель */
-    .sidebar {
-      position: fixed; top: 0; bottom: var(--taskbar-h); left: 0; width: 300px; z-index: 120;
-      transform: translateX(-100%); transition: transform .16s ease-out;
-      border-right: 1px solid var(--hairline);
-      box-shadow: 12px 0 40px rgba(0, 0, 0, .45);
-    }
-    #app.drawer-open .sidebar { transform: none; }
-    .drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 110; display: none; }
-    #app.drawer-open .drawer-backdrop { display: block; }
-    .drawer-close { margin-left: auto; padding: 2px 8px; }
-
-    /* шапка */
-    .chat-header {
-      padding: 8px 14px; background: var(--bar-bg); color: var(--bubble-text);
-      border: none; border-bottom: 1px solid var(--hairline);
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      flex: none;
-    }
-    .chat-header .title { color: var(--bubble-text); font-size: 16px; font-weight: 600; }
-    .chat-header .sub { color: var(--muted); font-size: 13px; white-space: nowrap; }
-    .chan-chip {
-      width: 26px; height: 26px; flex: none;
-      border: 1.5px solid var(--bubble-border); border-radius: 4px;
-      display: inline-flex; align-items: center; justify-content: center;
-      color: var(--bubble-text); font-size: 14px; font-weight: bold; line-height: 1;
-    }
-    html[data-theme="material"] .icon-call { padding: 2px 8px; font-size: 15px; line-height: 1.2; }
-
-    /* сообщения: контурные пузыри с хвостиком */
-    .messages { background: var(--chat-bg); padding: 14px 18px 18px; gap: 10px; }
-    .msg {
-      max-width: 78%; padding: 0; border: none; background: none; margin: 0;
-      display: flex; flex-direction: row; align-items: flex-end; gap: 9px;
-      color: var(--bubble-text); font-size: 14px;
-    }
-    /* перебиваем старые правила .msg.mine/.msg.theirs (у них выше специфичность
-       по фону — без этого остаётся цветная заливка всей строки) */
-    .msg.mine, .msg.theirs { background: none; border: none; padding: 0; margin: 0; font-size: 14px; }
-    .msg.mine .sender, .msg.theirs .sender { color: var(--bubble-text); }
-    .msg .msg-text { color: var(--bubble-text); }
-    .msg.mine { flex-direction: row-reverse; align-self: flex-end; }
-    .msg.theirs { align-self: flex-start; }
-    html[data-theme="material"] .msg { border: none; border-radius: 0; }
-    html[data-theme="material"] .msg .msg-avatar { border: none; border-radius: 8px; }
-    html[data-theme="material"] .msg .msg-avatar img { border-radius: 8px; }
-    html[data-theme="material"] .input-row { align-items: stretch; gap: 0; border-top: none; }
-    .msg .msg-avatar {
-      width: 30px; height: 30px; font-size: 13px; border: none; border-radius: 8px;
-      background: var(--title1); color: #fff;
-    }
-    .msg .msg-avatar img { border-radius: 8px; }
-    .msg-body {
-      position: relative; min-width: 0;
-      background: var(--bubble-bg); border: 1.5px solid var(--bubble-border);
-      border-radius: 16px; padding: 6px 12px 7px;
-    }
-    /* свои сообщения — вправо и чуть светлее, хвостиков нет */
-    .msg.mine .msg-body { background: var(--bubble-mine-bg); border-color: var(--bubble-mine-border); }
-    .msg .author { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }
-    .msg .sender { font-size: 12px; font-weight: bold; color: var(--bubble-text); }
-    .msg .time { font-size: 11px; color: var(--muted); margin-left: auto; align-self: auto; }
-    .msg .msg-text { font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-
-    /* ввод без рамки */
-    .input-row { display: block; padding: 4px 18px 8px; border: none; background: var(--chat-bg); }
-    .input-row textarea {
-      width: 100%; background: transparent; border: none; outline: none; resize: none;
-      color: var(--bubble-text); font-family: inherit; font-size: 15px; line-height: 1.5;
-      padding: 6px 2px; max-height: 150px; overflow-y: auto; margin: 0;
-    }
-    .input-row textarea::placeholder { color: #6f6f6f; }
-
-    /* нижняя панель: участники | комнаты | меню */
-    .appbar {
-      flex: none; display: flex; align-items: center; gap: 10px;
-      min-height: 50px; padding: 7px 12px;
-      background: var(--bar-bg); border-top: 1px solid var(--hairline);
-    }
-    .appbar-people { display: flex; align-items: center; gap: 6px; }
-    .appbar-sep { width: 1px; height: 26px; background: var(--hairline); flex: none; }
-    .appbar-rooms { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow-x: auto; padding: 2px 0; }
-    .appbar-rooms::-webkit-scrollbar { height: 0; }
-    .appbar-right { display: flex; align-items: center; gap: 10px; flex: none; }
-    .appbar-me { font-size: 14px; font-weight: 600; color: var(--bubble-text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* зелёный квадратик заменён аватаркой: у неё свой индикатор «в сети» */
-    .appbar-avatar { position: relative; width: 26px; height: 26px; flex: none; cursor: pointer; }
-    .appbar-avatar .avatar { width: 26px; height: 26px; font-size: 12px; }
-    .appbar-avatar-dot {
-      position: absolute; right: -1px; bottom: -1px;
-      width: 8px; height: 8px; background: #35d07f;
-      border: 2px solid var(--bar-bg);
-    }
-    .appbar-btn { padding: 3px 9px; font-size: 15px; line-height: 1.2; }
-    .room-chip {
-      display: inline-flex; align-items: center; gap: 6px; flex: none;
-      padding: 5px 10px; background: transparent; color: var(--chip-text);
-      border: 1.5px solid var(--bubble-border); border-radius: 8px;
-    }
-    .room-chip:hover { background: var(--chip-active-bg); }
-    .room-chip.active { background: var(--chip-active-bg); box-shadow: inset 0 0 0 1px var(--bubble-border); }
-    .room-chip .hash { font-weight: bold; line-height: 1; }
-    .room-chip .rname { font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .room-chip.add { padding: 5px 12px; font-size: 15px; color: var(--bubble-text); }
-    .ptile-btn { background: none; border: none; padding: 0; display: inline-flex; line-height: 1; }
-    .ptile-el {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px; border-radius: 8px; border: 2px solid #e8e8e8;
-      color: #fff; font-size: 13px; font-weight: bold; flex: none;
-    }
-    .ptile-btn.off .ptile-el { border-color: #5c5c5c; filter: saturate(.45) brightness(.8); }
-    .ptile-add { width: 30px; height: 30px; border-radius: 8px; border: 1.5px dashed #6a6a6a; color: #9a9a9a; align-items: center; justify-content: center; font-size: 16px; }
-    .chat-placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); flex: 1; }
-
-    /* --- значки (вместо эмодзи) --- */
-    .ico { display: inline-block; vertical-align: middle; flex: none; }
-    .theme-btn, .drawer-close, .appbar-btn, .icon-call, .ptile-add, .room-chip.add {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    }
-    .send-btn .ico, .mute-btn .ico { vertical-align: -2px; margin-right: 5px; }
-    .call-info .ico { margin-right: 6px; }
-    .ico-slot { display: inline-flex; align-items: center; color: var(--muted); }
-    .list-tick { color: var(--ok); display: inline-flex; align-items: center; }
-
-    @media (max-width: 720px) { .room-chip .rname { display: none; } }
+    @media (max-width: 720px) { .sidebar { width: 70px; } .list-item .info, .search { display: none; } .sidebar-header .logo span { display: none; } }
   </style>
   <script>
     (function () {
       // применить тему до первой отрисовки (без мерцания)
       try {
-        var v = localStorage.getItem('nk_theme') || 'material-dark';
+        var v = localStorage.getItem('nk_theme') || 'win98-light';
         if (/^standard-/.test(v)) v = v.replace('standard-', 'material-');
-        if (!/^(win98|material)-(light|dark)$/.test(v)) v = 'material-dark';
+        if (!/^(win98|material)-(light|dark)$/.test(v)) v = 'win98-light';
         var p = v.split('-');
         document.documentElement.dataset.theme = p[0];
         document.documentElement.dataset.mode = p[1];
@@ -757,9 +601,6 @@
         change_avatar: "Change avatar",
         add_title: "Create room / start conversation",
         btn_call_title: "Voice chat",
-        close_title: "Close",
-        channels_title: "Channels and people",
-        add_member_title: "Add member",
         th_style: "Style", th_mode: "Mode", th_light: "Light", th_dark: "Dark",
         lang_label: "Language",
         you_label: "Material You accent",
@@ -809,9 +650,6 @@
         change_avatar: "\u0421\u043c\u0435\u043d\u0438\u0442\u044c \u0430\u0432\u0430\u0442\u0430\u0440",
         add_title: "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u043e\u043c\u043d\u0430\u0442\u0443 / \u043d\u0430\u0447\u0430\u0442\u044c \u0434\u0438\u0430\u043b\u043e\u0433",
         btn_call_title: "\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0439 \u0447\u0430\u0442",
-        close_title: "\u0417\u0430\u043a\u0440\u044b\u0442\u044c",
-        channels_title: "\u041a\u0430\u043d\u0430\u043b\u044b \u0438 \u043b\u044e\u0434\u0438",
-        add_member_title: "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430",
         th_style: "\u0421\u0442\u0438\u043b\u044c", th_mode: "\u0420\u0435\u0436\u0438\u043c",
         th_light: "\u0421\u0432\u0435\u0442\u043b\u0430\u044f", th_dark: "\u0422\u0451\u043c\u043d\u0430\u044f",
         lang_label: "\u042f\u0437\u044b\u043a",
@@ -916,15 +754,13 @@
   <!-- APP VIEW -->
   <div id="app">
     <div class="layout">
-      <div class="drawer-backdrop" id="drawer-backdrop"></div>
       <div class="sidebar">
         <div class="sidebar-header">
           <div class="logo"><img src="/icon.png" class="logo-img" alt="logo" /><span>nekochat</span></div>
           <div class="user-box">
-            <button id="theme-btn" class="theme-btn" data-t-title="theme_title" title="Оформление"></button>
+            <button id="theme-btn" class="theme-btn" data-t-title="theme_title" title="Оформление">🎨</button>
             <div style="text-align:right;cursor:pointer" id="me-box"><div class="name" id="me-name"></div><div style="font-size:11px;color:var(--muted)" id="me-user"></div><div style="font-size:10px;color:var(--muted)" id="me-status"></div></div>
             <div class="avatar" id="me-avatar" data-t-title="profile_title" title="Профиль"></div>
-            <button class="drawer-close" id="drawer-close" data-t-title="close_title" title="Закрыть"></button>
           </div>
         </div>
         <input type="file" id="avatar-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" />
@@ -937,19 +773,21 @@
         <button class="add-btn" id="add-btn" data-t-title="add_title" title="Создать комнату / начать диалог">+</button>
       </div>
       <div class="chat">
-        <div class="chat-header">
-          <div style="display:flex;align-items:center;gap:9px" id="chat-header-info">
-            <span class="chan-chip" id="chat-chip">#</span>
-            <div>
-              <div class="title" id="chat-title">nekochat</div>
+        <div id="chat-placeholder" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text1)" data-t="placeholder_select">Готово. Выберите комнату или диалог.</div>
+        <div id="chat-active" style="display:none;flex:1;flex-direction:column;height:100%">
+          <div class="chat-header">
+            <div style="display:flex;align-items:center;gap:8px" id="chat-header-info">
+              <span class="avatar avatar-sm" id="chat-avatar"></span>
+              <div>
+                <div class="title" id="chat-title"></div>
+                <div class="sub" id="chat-sub"></div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="call-btn" id="call-btn" data-t-title="btn_call_title" title="Голосовой чат" data-t="btn_call" style="display:none">🎧 Позвонить</button>
+              <span class="status-badge offline" id="chat-status">—</span>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <button class="call-btn icon-call" id="call-btn" data-no-md data-t-title="btn_call_title" title="Голосовой чат" style="display:none"></button>            <span class="sub" id="chat-sub"></span>
-          </div>
-        </div>
-        <div class="chat-placeholder" id="chat-placeholder" data-t="placeholder_select">Готово. Выберите комнату или диалог.</div>
-        <div id="chat-active" class="chat-body" style="display:none;flex:1;flex-direction:column;min-height:0">
           <div id="call-panel" style="display:none">
             <div class="call-info" id="call-info" data-t="call_active">На звонке</div>
 <button class="send-btn" id="call-end" style="background:var(--face)" data-t="btn_end_call">Завершить</button>
@@ -957,18 +795,9 @@
           <div id="screen-box" style="display:none"><canvas id="screen-canvas" style="width:100%;display:block"></canvas></div>
           <div class="messages" id="messages"></div>
           <div class="typing" id="typing" style="display:none"></div>
-          <div class="input-row" data-no-md>
-            <textarea id="msg-input" rows="1" data-t-placeholder="message_ph" placeholder="Сообщение..." autocomplete="off"></textarea>
-          </div>
-        </div>
-        <div class="appbar" id="appbar" data-no-md>
-          <div class="appbar-people" id="appbar-people"></div>
-          <div class="appbar-sep"></div>
-          <div class="appbar-rooms" id="appbar-rooms"></div>
-          <div class="appbar-right">
-            <button class="appbar-btn" id="drawer-toggle" data-t-title="channels_title" title="Каналы и люди"></button>
-            <span class="appbar-me" id="appbar-me"></span>
-            <span class="appbar-avatar" id="appbar-avatar"></span>
+          <div class="input-row">
+            <input type="text" id="msg-input" data-t-placeholder="message_ph" placeholder="Сообщение..." autocomplete="off" />
+            <button class="send-btn" id="send-btn">➤</button>
           </div>
         </div>
       </div>
@@ -1090,12 +919,8 @@
     // контента (панель звонка) сразу после innerHTML и до addEventListener.
     function materialize(root) {
       if (document.documentElement.dataset.theme !== 'material') return;
-      // data-no-md — элементы макета (нижняя панель, поле ввода, кнопка звонка):
-      // их не трогаем, иначе md-компоненты принесут свои отступы и обводки.
-      const skip = el => !!(el.closest && el.closest('[data-no-md]'));
       root.querySelectorAll('button').forEach(b => {
         if (b.tagName.startsWith('MD-')) return;
-        if (skip(b)) return;
         const filled = b.id === 'auth-button' || b.id === 'add-btn' || b.id === 'send-btn' ||
                        b.id === 'call-btn' || b.id === 'call-answer' ||
                        b.classList.contains('btn-ok') || b.classList.contains('send-btn');
@@ -1110,7 +935,6 @@
       });
       root.querySelectorAll('input[type=text], input[type=password], textarea').forEach(inp => {
         if (inp.tagName.startsWith('MD-')) return;
-        if (skip(inp)) return;
         const md = document.createElement('md-outlined-text-field');
         [...inp.attributes].forEach(a => {
           if (a.name === 'type' || a.name === 'value' || a.name === 'size') return;
@@ -1141,14 +965,14 @@
       KEY: 'nk_theme',
       get() {
         var v;
-        try { v = localStorage.getItem(this.KEY) || 'material-dark'; } catch (e) { return 'material-dark'; }
+        try { v = localStorage.getItem(this.KEY) || 'win98-light'; } catch (e) { return 'win98-light'; }
         if (/^standard-/.test(v)) { v = v.replace('standard-', 'material-'); this.set(v); }
         return v;
       },
       set(v) { try { localStorage.setItem(this.KEY, v); } catch (e) {} },
       apply(v) {
         if (/^standard-/.test(v)) v = v.replace('standard-', 'material-');
-        if (!/^(win98|material)-(light|dark)$/.test(v)) v = 'material-dark';
+        if (!/^(win98|material)-(light|dark)$/.test(v)) v = 'win98-light';
         const p = v.split('-');
         document.documentElement.dataset.theme = p[0];
         document.documentElement.dataset.mode = p[1];
@@ -1158,8 +982,8 @@
     function syncThemeForm() {
       const p = Theme.get().split('-');
       const q = (n, val) => document.querySelector(`input[name="${n}"][value="${val}"]`);
-      const el = q('th-style', p[0]) || q('th-style', 'material');
-      const em = q('th-mode', p[1]) || q('th-mode', 'dark');
+      const el = q('th-style', p[0]) || q('th-style', 'win98');
+      const em = q('th-mode', p[1]) || q('th-mode', 'light');
       el.checked = true;
       em.checked = true;
     }
@@ -1260,13 +1084,6 @@
       return `<span class="avatar ${cls} ${ring}"${st}>${avatarContent(u)}</span>`;
     }
     function renderMe() {
-      const av = $('#appbar-avatar');
-      if (av) {
-        av.innerHTML = avatarHtml(me, '') +
-          '<span class="appbar-avatar-dot"></span>';
-        av.title = me.display_name || me.username;
-        av.onclick = () => openProfile(me);
-      }
       $('#me-name').textContent = me.display_name;
       $('#me-user').textContent = '@' + me.username;
       $('#me-avatar').innerHTML = avatarContent(me);
@@ -1275,7 +1092,6 @@
       else $('#me-avatar').style.removeProperty('--ring');
       $('#me-status').textContent = me.status || '';
       $('#me-status').style.display = me.status ? '' : 'none';
-      if ($('#appbar-me')) $('#appbar-me').textContent = me.display_name || me.username;
     }
     async function uploadAvatar(file) {
       if (!file) return;
@@ -1465,7 +1281,6 @@
       rememberUsers(conversations.map(conv => conv.user));
       rooms.forEach(room => rememberUsers(room.members));
       renderList();
-      renderAppbar();
     }
 
     // ---------- websocket ----------
@@ -1490,9 +1305,9 @@
         if (data.online) onlineUsers.add(data.user_id); else onlineUsers.delete(data.user_id);
         renderList();
         if (current && current.type === 'dm' && current.user.id === data.user_id) {
-          $('#chat-sub').textContent = data.online ? t('online') : t('offline');
+          $('#chat-status').className = 'status-badge ' + (data.online ? 'online' : 'offline');
+          $('#chat-status').textContent = data.online ? t('online') : t('offline');
         }
-        renderAppbar();
         return;
       }
       if (data.type === 'room_message') {
@@ -1574,7 +1389,7 @@
               <div class="title">${esc(u.display_name)}</div>
               <div class="meta">@${esc(u.username)}</div>
             </div>
-            ${conv ? `<span class="list-tick">${ico('check', 13)}</span>` : ''}`;
+            ${conv ? `<div style="font-size:11px;color:#555">✓</div>` : ''}`;
           el.onclick = () => openDM(u);
           list.appendChild(el);
         });
@@ -1609,11 +1424,15 @@
       const msgs = await api(`/rooms/${room.id}/messages`);
       $('#chat-placeholder').style.display = 'none';
       $('#chat-active').style.display = 'flex';
-      $('#chat-chip').textContent = '#';
+      $('#chat-avatar').className = 'avatar avatar-sm';
+      $('#chat-avatar').innerHTML = '#';
+      $('#chat-avatar').classList.remove('ring');
       $('#chat-header-info').style.cursor = 'default';
       delete $('#chat-header-info').dataset.userId;
-      $('#chat-title').textContent = room.name;
+      $('#chat-title').textContent = '# ' + room.name;
       $('#chat-sub').textContent = t('participants', room.member_count);
+      $('#chat-status').className = 'status-badge offline';
+      $('#chat-status').textContent = '—';
       $('#call-btn').style.display = '';  // голосовой канал комнаты
       $('#messages').innerHTML = '';
       rememberUsers(msgs.map(m => m.user));
@@ -1625,7 +1444,6 @@
         isMine: m.user.id === me.id,
       }));
       scrollBottom();
-      renderAppbar();
     }
 
     async function openDM(user) {
@@ -1642,13 +1460,18 @@
       current.conv = current.conv; // keep
       $('#chat-placeholder').style.display = 'none';
       $('#chat-active').style.display = 'flex';
-      const chip = $('#chat-chip');
-      chip.textContent = (user.display_name || user.username || '?')[0].toUpperCase();
+      $('#chat-avatar').className = 'avatar avatar-sm';
+      $('#chat-avatar').innerHTML = avatarContent(user);
+      $('#chat-avatar').classList.toggle('ring', !!user.profile_color);
+      if (user.profile_color) $('#chat-avatar').style.setProperty('--ring', user.profile_color);
+      else $('#chat-avatar').style.removeProperty('--ring');
       $('#chat-header-info').style.cursor = 'pointer';
       $('#chat-header-info').dataset.userId = user.id;
       $('#chat-title').textContent = user.display_name;
+      $('#chat-sub').textContent = '@' + user.username;
       const online = onlineUsers.has(user.id);
-      $('#chat-sub').textContent = online ? t('online') : t('offline');
+      $('#chat-status').className = 'status-badge ' + (online ? 'online' : 'offline');
+      $('#chat-status').textContent = online ? t('online') : t('offline');
       $('#call-btn').style.display = '';
       $('#messages').innerHTML = '';
       rememberUsers(msgs.map(m => m.sender));
@@ -1660,24 +1483,23 @@
         isMine: m.sender.id === me.id,
       }));
       scrollBottom();
-      renderAppbar();
     }
 
     function appendMessage({ content, sender_id, sender_name, time, isMine }) {
       const container = $('#messages');
       const el = document.createElement('div');
+      const showSender = !isMine && sender_name && sender_id !== (me.id);
       const sender = sender_id != null && userById.get(sender_id)
         ? userById.get(sender_id)
         : { avatar: null, display_name: sender_name, username: '' };
-      const name = (sender && (sender.display_name || sender.username)) || sender_name || '?';
       el.className = 'msg ' + (isMine ? 'mine' : 'theirs');
-      el.dataset.userId = sender_id != null ? sender_id : '';
       el.innerHTML = `
-        ${avatarHtml(sender, 'msg-avatar')}
-        <div class="msg-body">
-          <div class="author"><span class="sender">${esc(name)}</span><span class="time">${fmtTime(time)}</span></div>
-          <div class="msg-text">${esc(content)}</div>
-        </div>`;
+        <div class="msg-head" data-user-id="${sender_id != null ? sender_id : ''}">
+          ${avatarHtml(sender, 'msg-avatar')}
+          ${showSender ? `<span class="sender">${esc(sender_name)}</span>` : ''}
+        </div>
+        <div>${esc(content)}</div>
+        <div class="time">${fmtTime(time)}</div>`;
       container.appendChild(el);
       scrollBottom();
     }
@@ -1699,131 +1521,23 @@
       c.scrollTop = c.scrollHeight;
     }
 
-    // ---------- значки (вместо эмодзи) ----------
-    const ICO = {
-      menu: 'M4 7h16M4 12h16M4 17h16',
-      phone: 'M6.4 3.5h2.8l1.6 4-2.1 1.6a12.4 12.4 0 0 0 6.2 6.2l1.6-2.1 4 1.6v2.8a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.4 5.7a2 2 0 0 1 2-2.2z',
-      mail: 'M3.5 6.5h17v11h-17zM3.5 7.5l8.5 6 8.5-6',
-      plus: 'M12 5.5v13M5.5 12h13',
-      user: 'M12 11.6a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4zM4.8 20a7.2 7.2 0 0 1 14.4 0',
-      userPlus: 'M9.6 11.4a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3.4 20a6.2 6.2 0 0 1 9.2-5.4M18.5 14v6M15.5 17h6',
-      settings: 'M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zM12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7',
-      refresh: 'M20 12a8 8 0 1 1-2.4-5.7M20 4.4V9h-4.6',
-      power: 'M12 3.5v8M7.4 6.1a7.6 7.6 0 1 0 9.2 0',
-      mic: 'M12 4.2a2.6 2.6 0 0 1 2.6 2.6v5a2.6 2.6 0 0 1-5.2 0v-5A2.6 2.6 0 0 1 12 4.2zM6 11.4a6 6 0 0 0 12 0M12 17.4v3.2M9 20.6h6',
-      micOff: 'M9.2 5.1A2.6 2.6 0 0 1 14.6 6.8v4.4M9.4 9.6v3.2a2.6 2.6 0 0 0 4.4 1.9M6 11.4a6 6 0 0 0 9.2 5.1M18 11.4v.6M12 17.4v3.2M9 20.6h6M4 4l16 16',
-      monitor: 'M3.5 5.5h17v10h-17zM9 19.5h6M12 15.5v4',
-      stop: 'M7.5 7.5h9v9h-9z',
-      close: 'M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8',
-      check: 'M5 12.6l4.6 4.6L19 7.4',
-      palette: 'M12 3.6a8.4 8.4 0 0 0 0 16.8c1.4 0 2-1 2-2 0-1.5-1.5-1.7-1.5-3 0-1 .8-1.7 1.8-1.7h1.4a4.7 4.7 0 0 0 4.7-4.7c0-3-3.8-5.4-8.4-5.4zM7.6 12.2h.01M9.6 8.4h.01M14 7.6h.01',
-      arrow: 'M5 12h14M13.2 6l6 6-6 6',
-      search: 'M11 4.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8zM15.8 15.8l4 4',
-    };
-    function ico(name, size) {
-      const d = ICO[name] || ICO.plus;
-      const s = size || 18;
-      return '<svg class="ico" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" ' +
-        'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="' + d + '"></path></svg>';
-    }
-
-    // ---------- отправка ----------
-    function autoGrow() {
-      const ta = $('#msg-input');
-      ta.style.height = 'auto';
-      ta.style.height = Math.min(ta.scrollHeight, 150) + 'px';
-    }
+    // ---------- sending ----------
     function send() {
       const input = $('#msg-input');
       const content = input.value.trim();
       if (!content || !current || !ws) return;
       input.value = '';
-      autoGrow();
       if (current.type === 'room') {
         ws.send(JSON.stringify({ type: 'room_message', room_id: current.room.id, content }));
       } else {
         ws.send(JSON.stringify({ type: 'direct_message', to_id: current.user.id, content }));
       }
     }
-    $('#msg-input').addEventListener('input', autoGrow);
-    $('#msg-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    });
-
-    // ---------- нижняя панель: участники | комнаты | меню ----------
-    const AV_COLORS = ['#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3',
-                       '#00bcd4', '#009688', '#4caf50', '#ff9800', '#f44336'];
-    function tileColor(u) {
-      if (u && /^#[0-9a-f]{6}$/i.test(u.profile_color || '')) return u.profile_color;
-      const name = (u && u.username) || '?';
-      let h = 0;
-      for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-      return AV_COLORS[h % AV_COLORS.length];
-    }
-    function tileLetter(u) {
-      return ((u && (u.display_name || u.username)) || '?')[0].toUpperCase();
-    }
-    function renderAppbar() {
-      const ppl = $('#appbar-people');
-      const chips = $('#appbar-rooms');
-      if (!ppl || !chips) return;
-      ppl.innerHTML = '';
-      chips.innerHTML = '';
-      let people = [];
-      if (current && current.type === 'room') people = (current.room.members || []);
-      else if (current && current.type === 'dm') people = [current.user];
-      people.forEach(u => {
-        const b = document.createElement('button');
-        const on = onlineUsers.has(u.id);
-        b.className = 'ptile-btn' + (on ? '' : ' off');
-        b.title = u.id === me.id ? (u.display_name || u.username) : (t('send_msg') + ': ' + (u.display_name || u.username));
-        b.innerHTML = '<span class="ptile-el" style="background:' + tileColor(u) + '">' + esc(tileLetter(u)) + '</span>';
-        if (u.id !== me.id) b.onclick = () => openDM(userById.get(u.id) || u);
-        ppl.appendChild(b);
-      });
-      const add = document.createElement('button');
-      add.className = 'ptile-add';
-      add.title = t('add_member_title');
-      add.textContent = '+';
-      add.onclick = () => openModal('add_member');
-      ppl.appendChild(add);
-      rooms.forEach(r => {
-        const b = document.createElement('button');
-        const active = current && current.type === 'room' && current.room.id === r.id;
-        b.className = 'room-chip' + (active ? ' active' : '');
-        b.title = r.name;
-        b.innerHTML = '<span class="hash">#</span><span class="rname">' + esc(r.name) + '</span>';
-        b.onclick = () => openRoom(r);
-        chips.appendChild(b);
-      });
-      const addR = document.createElement('button');
-      addR.className = 'room-chip add';
-      addR.title = t('modal_room');
-      addR.textContent = '+';
-      addR.onclick = () => openModal('add_room');
-      chips.appendChild(addR);
-      $('#appbar-me').textContent = me.display_name || me.username;
-    }
-
-    // ---------- выезжающая панель ----------
-    function setDrawer(open) {
-      $('#app').classList.toggle('drawer-open', !!open);
-    }
-    $('#drawer-toggle').innerHTML = ico('menu', 17);
-    $('#call-btn').innerHTML = ico('phone', 17);
-    $('#drawer-toggle').addEventListener('click', () => setDrawer(!$('#app').classList.contains('drawer-open')));
-    $('#drawer-close').innerHTML = ico('close', 14);
-    $('#drawer-close').addEventListener('click', () => setDrawer(false));
-    $('#drawer-backdrop').addEventListener('click', () => setDrawer(false));
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') setDrawer(false);
-      if (e.key === 'F1' || (e.ctrlKey && e.key === 'k')) { e.preventDefault(); setDrawer(true); }
-    });
+    $('#send-btn').addEventListener('click', send);
+    $('#msg-input').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 
     // ---------- theme switcher ----------
     $('#auth-theme-link').addEventListener('click', openTheme);
-    $('#theme-btn').innerHTML = ico('palette', 15);
     $('#theme-btn').addEventListener('click', openTheme);
     document.querySelectorAll('#theme-overlay input[type=radio]').forEach(r =>
       r.addEventListener('change', () => {
@@ -1874,18 +1588,21 @@
 
     // ---------- modal / add ----------
     let modalMode = 'room';
-    function openModal(mode) {
-      modalMode = mode;
-      const ph = { room: 'modal_room_ph', dm: 'modal_dm_ph', member: 'modal_dm_ph' }[mode] || 'modal_room_ph';
-      const title = { room: 'modal_room', dm: 'modal_dm', member: 'add_member_title' }[mode] || 'modal_room';
-      $('#modal-title').textContent = t(title);
-      $('#modal-input').placeholder = t(ph);
-      $('#modal-input2').style.display = 'none';
+    $('#add-btn').addEventListener('click', () => {
+      if (currentView === 'rooms') {
+        modalMode = 'room';
+        $('#modal-title').textContent = t('modal_room');
+        $('#modal-input').placeholder = t('modal_room_ph');
+        $('#modal-input2').style.display = 'none';
+      } else {
+        modalMode = 'dm';
+        $('#modal-title').textContent = t('modal_dm');
+        $('#modal-input').placeholder = t('modal_dm_ph');
+        $('#modal-input2').style.display = 'none';
+      }
       $('#modal-input').value = '';
       $('#modal-overlay').style.display = 'flex';
-      setTimeout(() => { const i = $('#modal-input'); if (i.focus) i.focus(); }, 30);
-    }
-    $('#add-btn').addEventListener('click', () => openModal(currentView === 'rooms' ? 'room' : 'dm'));
+    });
 
     $('#modal-cancel').addEventListener('click', () => { $('#modal-overlay').style.display = 'none'; });
     $('#modal-ok').addEventListener('click', async () => {
@@ -1897,11 +1614,6 @@
           const room = await api('/rooms', { method: 'POST', body: JSON.stringify({ name: val }) });
           await refreshData();
           await openRoom(room);
-        } else if (modalMode === 'member') {
-          if (!current || current.type !== 'room') return;
-          const room = await api(`/rooms/${current.room.id}/members`, { method: 'POST', body: JSON.stringify({ username: val }) });
-          await refreshData();
-          await openRoom(rooms.find(r => r.id === room.id) || room);
         } else {
           const u = users.find(x => x.username === val);
           if (!u) throw new Error(t('user_not_found'));
@@ -1916,7 +1628,9 @@
     // online status refresh
     setInterval(() => {
       if (current && current.type === 'dm' && current.user) {
-        $('#chat-sub').textContent = onlineUsers.has(current.user.id) ? t('online') : t('offline');
+        const online = onlineUsers.has(current.user.id);
+        $('#chat-status').className = 'status-badge ' + (online ? 'online' : 'offline');
+        $('#chat-status').textContent = online ? t('online') : t('offline');
       }
     }, 1000);
 
@@ -1977,17 +1691,15 @@
       $('#call-panel').style.display = 'none';
       $('#call-panel').innerHTML = '';
     }
-    function callBtn(id, label, cls, icon) {
-      return '<button class="send-btn ' + (cls || '') + '" id="' + id + '">' +
-        (icon ? ico(icon, 15) : '') + '<span>' + label + '</span></button>';
-    }
     function showCallActive(label, withScreen) {
-      const screenBtn = withScreen ? callBtn('screen-btn', t('screen_share'), 'mute-btn', 'monitor') : '';
+      const screenBtn = withScreen
+        ? '<button class="mute-btn" id="screen-btn">' + t('screen_share') + '</button>'
+        : '';
       callUi(callInfo(label) +
         '<div style="display:flex;gap:8px">' +
-        callBtn('mute-btn', muted ? t('muted') : t('unmuted'), 'mute-btn', muted ? 'micOff' : 'mic') +
+        '<button class="mute-btn" id="mute-btn">' + (muted ? t('muted') : t('unmuted')) + '</button>' +
         screenBtn +
-        callBtn('call-end', t('btn_end_call'), '', 'phone') +
+        '<button class="send-btn" id="call-end">' + t('btn_end_call') + '</button>' +
         '</div>');
       $('#mute-btn').addEventListener('click', toggleMute);
       const sb = $('#screen-btn');
@@ -1995,10 +1707,10 @@
       $('#call-end').addEventListener('click', () => hangup());
     }
     function showCallIncoming(label) {
-      callUi(callInfo(ico('phone', 15) + ' ' + t('call_incoming') + esc(label)) +
+      callUi(callInfo(t('call_incoming') + label) +
         '<div style="display:flex;gap:8px">' +
-        callBtn('call-answer', t('btn_answer')) +
-        callBtn('call-decline', t('btn_decline')) +
+        '<button class="send-btn" id="call-answer">' + t('btn_answer') + '</button>' +
+        '<button class="send-btn" id="call-decline">' + t('btn_decline') + '</button>' +
         '</div>');
       $('#call-answer').addEventListener('click', answerCall);
       $('#call-decline').addEventListener('click', () => {
@@ -2007,7 +1719,8 @@
       });
     }
     function showCallEnded(reason) {
-      callUi(callInfo(reason) + callBtn('call-end', t('btn_end_call')));
+      callUi(callInfo(reason) +
+        '<button class="send-btn" id="call-end">' + t('btn_end_call') + '</button>');
       $('#call-end').addEventListener('click', () => endCall(false, ''));
     }
 
@@ -2314,17 +2027,16 @@
       el.innerHTML = participants.map(p =>
         '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;min-width:200px">' +
         '<span class="status-badge online"></span><span>' + esc(userName(p.id)) + '</span>' +
-        (p.screen ? '<span class="ico-slot">' + ico('monitor', 14) + '</span>' : '') +
+        (p.screen ? '<span>🖥</span>' : '') +
         '</div>'
       ).join('');
     }
     function showChannelInvite(label) {
       callUi(
-        ico('phone', 15) + ' ' + esc(t('call_incoming')) + ' <b>' + esc(label) + '</b>' +
-        ico('arrow', 14) + ' ' + esc(t('voice_channel')) +
+        esc(t('call_incoming')) + ' <b>' + esc(label) + '</b> → ' + esc(t('voice_channel')) +
         '<div style="display:flex;gap:8px;margin-top:6px">' +
-        callBtn('call-answer', esc(t('join_channel'))) +
-        callBtn('call-decline', esc(t('later'))) +
+        '<button class="send-btn" id="call-answer">' + esc(t('join_channel')) + '</button>' +
+        '<button class="send-btn" id="call-decline">' + esc(t('later')) + '</button>' +
         '</div>'
       );
       $('#call-answer').addEventListener('click', answerCall);
@@ -2332,13 +2044,13 @@
     }
     function showChannelActive(label) {
       callUi(
-        ico('phone', 15) + ' <b>' + esc(t('voice_channel')) + '</b>' +
+        '<b>' + esc(t('voice_channel')) + '</b>' +
         '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px">' + label + '</div>' +
         '<div id="channel-members" style="min-width:190px"></div>' +
         '<div style="display:flex;gap:8px">' +
-        callBtn('mute-btn', muted ? t('muted') : t('unmuted'), 'mute-btn', muted ? 'micOff' : 'mic') +
-        callBtn('screen-btn', esc(t('screen_share')), 'mute-btn', 'monitor') +
-        callBtn('call-end', esc(t('btn_end_call'))) +
+        '<button class="mute-btn" id="mute-btn">' + (muted ? t('muted') : t('unmuted')) + '</button>' +
+        '<button class="mute-btn" id="screen-btn">' + esc(t('screen_share')) + '</button>' +
+        '<button class="send-btn" id="call-end">' + esc(t('btn_end_call')) + '</button>' +
         '</div>'
       );
       $('#mute-btn').addEventListener('click', toggleMute);

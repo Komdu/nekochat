@@ -152,7 +152,7 @@ export function CallOverlay() {
                   }}
                   title={call.screenOn ? "Остановить демонстрацию экрана" : "Демонстрация экрана"}
                 >
-                  {call.screenOn ? <><Icon name="stop" size={15} /> <Icon name="monitor" size={15} /></> : <Icon name="monitor" size={15} />}
+                  {call.screenOn ? <><Icon name="stop" size={14} /> <Icon name="monitor" size={15} /></> : <Icon name="monitor" size={15} />}
                 </button>
               )}
               <button className="call-btn call-decline" onClick={() => hangupCall()}>

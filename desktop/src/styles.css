@@ -34,21 +34,6 @@
   --surface-high: #2b2930;
   --surface-highest: #36343b;
 
-  /* Плоский тёмный чат по макету: почти чёрный фон, контурные пузыри
-     со светлой обводкой и хвостиком. Не зависит от акцента Material You —
-     цветные только плитки-аватарки. Переопределяется темой win98. */
-  --chat-bg: #1a1a1a;
-  --bar-bg: #151515;
-  --bubble-bg: #212121;
-  --bubble-border: #d8d8d8;
-  --bubble-text: #f3f3f3;
-  --hairline: #383838;
-  --chip-active-bg: #2f2f2f;
-  --chip-text: #dcdcdc;
-  /* свои сообщения — чуть светлее, чтобы читались как «мои» без хвостиков */
-  --bubble-mine-bg: #2b2b2b;
-  --bubble-mine-border: #f0f0f0;
-
   color-scheme: dark;
 }
 
@@ -72,7 +57,7 @@ input, textarea { font: inherit; }
 .boot-text { color: var(--muted); font-size: 14px; }
 
 /* ---------- каркас ---------- */
-.app { display: flex; flex-direction: column; height: 100vh; background: var(--chat-bg); }
+.app { display: flex; height: 100vh; background: var(--desk); }
 .chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 /* ---------- login ---------- */
@@ -132,7 +117,6 @@ input, textarea { font: inherit; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .icon-btn:hover { background: var(--panel-hover); color: var(--text1); }
-.icon-btn .ico { display: block; }
 
 .sec-label { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); padding: 12px 12px 4px; }
 .list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; max-height: 34vh; }
@@ -150,130 +134,39 @@ input, textarea { font: inherit; }
 .list-item.active .item-name.off { color: #c9b8ff; }
 
 /* ---------- шапка чата ---------- */
-.chat-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 16px; background: var(--bar-bg);
-  border-bottom: 1px solid var(--hairline);
-  flex: none;
-}
-.chat-titlebox { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.chat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--divider); }
+.chat-titlebox { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .chat-titles { min-width: 0; }
-/* квадратная иконка канала из макета: белый контурный # на тёмном фоне */
-.chan-chip {
-  width: 28px; height: 28px; flex: none;
-  border: 1.5px solid var(--bubble-border); border-radius: 4px;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--bubble-text); font-size: 15px; font-weight: 700; line-height: 1;
-}
-.chat-title { font-size: 17px; font-weight: 600; color: var(--bubble-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-sub { font-size: 14px; color: var(--muted); white-space: nowrap; }
-.chat-btns { display: flex; align-items: center; gap: 8px; color: var(--bubble-text); }
-.chat-btns .icon-btn { color: var(--bubble-text); }
-.chat-btns .icon-btn:hover { background: var(--chip-active-bg); }
+.chat-title { font-size: 17px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-sub { font-size: 12px; color: var(--muted); }
+.chat-btns { display: flex; gap: 2px; }
 
 /* ---------- сообщения ---------- */
-.msgs { flex: 1; overflow-y: auto; padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.msgs { flex: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
 .empty-msgs { color: var(--muted); margin: 24px auto; font-size: 14px; }
 .empty-chat { margin: 60px auto; color: var(--muted); font-size: 15px; }
 
 .msg { display: flex; align-items: flex-end; gap: 10px; }
-/* свои — вправо, чужие — влево (родитель .msgs — flex-колонка) */
-.msg.mine { flex-direction: row-reverse; align-self: flex-end; }
-.msg.theirs { align-self: flex-start; }
-.msg .msg-avatar { align-self: flex-end; }
+.msg.mine { justify-content: flex-end; }
 .msg-body {
   max-width: min(78%, 660px);
-  background: var(--bubble-bg);
-  border: 1.5px solid var(--bubble-border);
-  border-radius: 16px;
-  padding: 7px 13px 8px;
-  color: var(--bubble-text);
+  background: var(--surface-high); border-radius: 16px 16px 16px 6px;
+  padding: 8px 13px; box-shadow: 0 1px 2px rgba(0,0,0,.18);
 }
-.msg.mine .msg-body {
-  background: var(--bubble-mine-bg);
-  border-color: var(--bubble-mine-border);
-}
-.msg-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 2px; }
-.msg-name { font-size: 12.5px; font-weight: 700; color: var(--bubble-text); }
+.msg.mine .msg-body { background: var(--mine); border-radius: 16px 16px 6px 16px; }
+.msg-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 3px; }
+.msg-name { font-size: 12.5px; font-weight: 700; }
+.msg.mine .msg-name { color: var(--mine-sender); }
 .msg-time { font-size: 11px; color: var(--muted); margin-left: auto; }
-.msg-text { font-size: 14.5px; line-height: 1.45; overflow-wrap: break-word; user-select: text; white-space: pre-wrap; color: var(--bubble-text); }
+.msg.mine .msg-time { color: var(--muted); margin-left: auto; }
+.msg-text { font-size: 14.5px; line-height: 1.45; overflow-wrap: break-word; user-select: text; white-space: pre-wrap; }
+.msg.mine .msg-text { color: var(--mine-sender); }
 
-/* ---------- ввод (без рамки, во всю ширину) ---------- */
-.composer { flex: none; padding: 4px 20px 10px; background: var(--chat-bg); }
-.composer-input {
-  width: 100%; background: transparent; border: none; outline: none; resize: none;
-  color: var(--bubble-text); font-size: 15px; line-height: 1.5;
-  padding: 8px 2px; max-height: 150px; overflow-y: auto;
-  font-family: inherit;
-}
-.composer-input::placeholder { color: #6f6f6f; }
-.note-bar { margin: 0 18px 8px; padding: 8px 14px; border-radius: 12px; background: rgba(49, 198, 109, .12); color: #7ef0a8; font-size: 13px; }
-
-/* ---------- нижняя панель: участники | комнаты | меню ---------- */
-.appbar {
-  flex: none;
-  display: flex; align-items: center; gap: 10px;
-  min-height: 52px; padding: 8px 14px;
-  background: var(--bar-bg); border-top: 1px solid var(--hairline);
-}
-.appbar-people { display: flex; align-items: center; gap: 6px; }
-.appbar-sep { width: 1px; height: 26px; background: var(--hairline); flex: none; }
-.appbar-rooms {
-  display: flex; align-items: center; gap: 8px;
-  flex: 1; min-width: 0; overflow-x: auto; padding: 2px 0;
-  scrollbar-width: none;
-}
-.appbar-rooms::-webkit-scrollbar { height: 0; }
-.appbar-right { display: flex; align-items: center; gap: 10px; flex: none; }
-.appbar-me { font-size: 14px; font-weight: 600; color: var(--bubble-text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* зелёный квадратик заменён аватаркой: у неё свой индикатор «в сети» */
-.appbar-me-avatar { cursor: pointer; }
-
-.room-chip {
-  display: inline-flex; align-items: center; gap: 6px; flex: none;
-  padding: 6px 10px;
-  background: transparent; color: var(--chip-text);
-  border: 1.5px solid var(--bubble-border); border-radius: 8px;
-}
-.room-chip:hover { background: var(--chip-active-bg); }
-.room-chip.active { background: var(--chip-active-bg); box-shadow: inset 0 0 0 1px var(--bubble-border); }
-.room-chip .hash { font-weight: 700; line-height: 1; }
-.room-chip .rname { font-size: 12.5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.room-chip.add { padding: 6px 12px; font-size: 15px; line-height: 1; color: var(--bubble-text); }
-@media (max-width: 720px) { .room-chip .rname { display: none; } }
-
-/* плитки-аватарки участников (цветные квадраты с буквой) */
-.ptile-btn { background: none; border: none; padding: 0; display: inline-flex; line-height: 1; }
-.ptile-el {
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 8px; border: 2px solid #e8e8e8; color: #fff; user-select: none;
-  flex: none;
-}
-.ptile-el.off { border-color: #5c5c5c; filter: saturate(.45) brightness(.8); }
-.ptile-add {
-  width: 30px; height: 30px; border-radius: 8px;
-  border: 1.5px dashed #6a6a6a; color: #9a9a9a;
-  align-items: center; justify-content: center;
-}
-.ptile-add:hover { color: var(--bubble-text); border-color: var(--bubble-border); }
-
-/* ---------- выезжающая панель (список комнат и людей) ---------- */
-.drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 80; }
-.drawer {
-  position: fixed; top: 0; left: 0; bottom: 0; width: 300px; z-index: 90;
-  background: var(--panel); border-right: 1px solid var(--hairline);
-  display: flex; flex-direction: column; overflow: hidden;
-  animation: drawer-in .16s ease-out;
-  box-shadow: 12px 0 40px rgba(0, 0, 0, .45);
-}
-@keyframes drawer-in { from { transform: translateX(-100%); } to { transform: none; } }
-.drawer-actions {
-  display: flex; align-items: center; gap: 4px; flex: none;
-  padding: 10px 10px 6px; border-bottom: 1px solid var(--hairline);
-}
-.drawer .sidebar {
-  width: 100%; border-radius: 0; background: transparent; padding: 8px 10px 10px;
-}
+/* ---------- ввод ---------- */
+.chat-input-row { display: flex; gap: 10px; padding: 12px 18px 16px; }
+.chat-input { flex: 1; }
+.send-btn { padding: 10px 24px; }
+.note-bar { margin: 0 18px; padding: 8px 14px; border-radius: 12px; background: rgba(49, 198, 109, .12); color: #7ef0a8; font-size: 13px; }
 
 /* ---------- диалоги ---------- */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
@@ -328,17 +221,6 @@ html[data-theme="win98"] {
   --surface-low: #ffffff;
   --surface-lowest: #ffffff;
   --outline-variant: #808080;
-  /* плоский чат по макету — в win98 возвращаем ретро-поверхности */
-  --chat-bg: #c0c0c0;
-  --bar-bg: #c0c0c0;
-  --bubble-bg: #ffffc1;
-  --bubble-border: #808080;
-  --bubble-text: #000000;
-  --bubble-mine-bg: #d4d0c8;
-  --bubble-mine-border: #404040;
-  --hairline: #808080;
-  --chip-active-bg: #000080;
-  --chip-text: #000000;
   font-size: 12px;
 }
 html[data-theme="win98"] body { background: var(--desk); }
@@ -390,28 +272,6 @@ html[data-theme="win98"] .note-bar { background: #ffffe1; color: #000000; border
 html[data-theme="win98"] .login-err { background: #d4d0c8; color: #800000; border: 1px solid #808080; border-radius: 0; }
 html[data-theme="win98"] input[type="radio"],
 html[data-theme="win98"] input[type="checkbox"] { accent-color: #000080; }
-
-/* Win98: макетные элементы — квадраты, без хвостиков у пузырей */
-html[data-theme="win98"] .msg-body { border: 2px solid; border-color: #ffffff #404040 #404040 #ffffff; box-shadow: none; }
-html[data-theme="win98"] .msg.mine .msg-body { border-color: #ffffff #404040 #404040 #ffffff; }
-html[data-theme="win98"] .msg.mine .msg-name { color: #000080; }
-html[data-theme="win98"] .composer-input { color: #000000; }
-html[data-theme="win98"] .composer-input::placeholder { color: #606060; }
-html[data-theme="win98"] .chan-chip { border: 2px solid; border-color: #ffffff #404040 #404040 #ffffff; color: #000000; }
-html[data-theme="win98"] .appbar, html[data-theme="win98"] .chat-head { border-color: #808080; }
-html[data-theme="win98"] .appbar-sep { background: #808080; }
-html[data-theme="win98"] .room-chip {
-  border: 2px solid; border-color: #ffffff #404040 #404040 #ffffff;
-  color: #000000; border-radius: 0; background: #d4d0c8;
-}
-html[data-theme="win98"] .room-chip.active { background: #000080; color: #ffffff; box-shadow: none; }
-html[data-theme="win98"] .room-chip:hover { background: #d4d0c8; }
-html[data-theme="win98"] .room-chip.add { border-style: dashed; }
-html[data-theme="win98"] .ptile-el { border-radius: 2px; border: 2px solid; border-color: #ffffff #404040 #404040 #ffffff; }
-html[data-theme="win98"] .ptile-add { border: 2px dashed #808080; color: #000000; background: #d4d0c8; }
-html[data-theme="win98"] .appbar-me { color: #000000; }
-html[data-theme="win98"] .drawer { border-right: 2px solid; border-color: #404040 #ffffff #ffffff #404040; box-shadow: none; }
-html[data-theme="win98"] .drawer-backdrop { background: rgba(0, 0, 0, .35); }
 
 html[data-mode="light"]:not([data-theme="win98"]) { color-scheme: light; }
 
