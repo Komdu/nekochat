@@ -20,7 +20,7 @@ from .docs_page import docs_page_html
 from .models import User
 from . import admin
 from .nats_bridge import nats_bridge
-from .routers import auth, avatars, http_stream, nats_creds, rooms, users, ws
+from .routers import auth, avatars, http_stream, nats_creds, rooms, users, ws, ws_media
 
 APP_VERSION = "0.10.0"  # версия сервера: /api/server-info, лендинг, /download-страница
 
@@ -231,6 +231,7 @@ app.include_router(rooms.router)
 app.include_router(users.router)
 app.include_router(avatars.router)
 app.include_router(ws.router)
+app.include_router(ws_media.router)
 app.include_router(http_stream.router)
 app.include_router(nats_creds.router)
 app.include_router(admin.router)

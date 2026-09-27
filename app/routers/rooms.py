@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import Message, Room, User
+from ..ws_media import room_members
 from ..schemas import MemberAdd, MessageOut, RoomCreate, RoomOut
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -37,6 +38,7 @@ def create_room(payload: RoomCreate, user: User = Depends(get_current_user), db:
     db.add(room)
     db.commit()
     db.refresh(room)
+    room_members.invalidate(room.id)
     return _to_out(room)
 
 
@@ -59,6 +61,7 @@ def join_room(room_id: int, user: User = Depends(get_current_user), db: Session 
         room.members.append(user)
         db.commit()
     db.refresh(room)
+    room_members.invalidate(room.id)
     return _to_out(room)
 
 
@@ -76,4 +79,5 @@ def add_member(room_id: int, payload: MemberAdd, user: User = Depends(get_curren
         room.members.append(target)
         db.commit()
     db.refresh(room)
+    room_members.invalidate(room.id)
     return _to_out(room)
