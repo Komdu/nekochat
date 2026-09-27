@@ -54,6 +54,25 @@ KIND_FILE = 3
 FLAG_ROOM = 1 << 0
 FLAG_LAST = 1 << 1
 
+# Биты 2..15 в flags отданы под номер потока файла (0..16382). Так квотами
+# можно управлять без роста заголовка: «файл» идентифицируется парой
+# (stream_id, адресат). Для аудио/видео stream_id всегда 0.
+STREAM_SHIFT = 2
+STREAM_MASK = 0x3FFF
+
+
+def pack_flags(room: bool, last: bool, stream: int = 0) -> int:
+    f = (FLAG_ROOM if room else 0) | (FLAG_LAST if last else 0)
+    return f | ((stream & STREAM_MASK) << STREAM_SHIFT)
+
+
+def unpack_flags(flags: int) -> tuple[bool, bool, int]:
+    return (
+        bool(flags & FLAG_ROOM),
+        bool(flags & FLAG_LAST),
+        (flags >> STREAM_SHIFT) & STREAM_MASK,
+    )
+
 # Приоритет: меньше — важнее. Используется и в очереди, и в сортировке.
 PRIO_VOICE = 0
 PRIO_CTRL = 1
@@ -244,6 +263,33 @@ class MediaHub:
 
     def __init__(self) -> None:
         self.conns: dict[str, dict[int, set[MediaConn]]] = {"media": {}, "transfer": {}}
+        # квоты на файлы: user_id -> {(stream_id, target)}
+        self.file_streams: dict[int, set[tuple[int, int]]] = {}
+        self.quota_rejects = 0
+
+    def admit_file(self, user_id: int, stream: int, target: int) -> bool:
+        """Пустить ли новый файловый поток. Файлы — единственное, что можно
+        вежливо не пустить: они одноразовые, получатель просто попросит ещё раз."""
+        cur = self.file_streams.setdefault(user_id, set())
+        key = (stream, target)
+        if key in cur:
+            return True  # продолжение уже идущего файла
+        if len(cur) >= settings.transfer_max_files_per_user:
+            self.quota_rejects += 1
+            return False
+        cur.add(key)
+        return True
+
+    def close_file(self, user_id: int, stream: int, target: int) -> None:
+        cur = self.file_streams.get(user_id)
+        if cur is not None:
+            cur.discard((stream, target))
+            if not cur:
+                self.file_streams.pop(user_id, None)
+
+    def drop_user_files(self, user_id: int) -> None:
+        """Сокет отвалился — потоки этого отправителя больше не активны."""
+        self.file_streams.pop(user_id, None)
 
     def add(self, conn: MediaConn) -> None:
         self.conns[conn.kind].setdefault(conn.user_id, set()).add(conn)
@@ -313,6 +359,8 @@ class MediaHub:
                 "tx": total_tx,
                 "dropped": dropped,
             }
+        out["file_streams"] = sum(len(v) for v in self.file_streams.values())
+        out["quota_rejects"] = self.quota_rejects
         return out
 
 

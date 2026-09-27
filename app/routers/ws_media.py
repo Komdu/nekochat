@@ -31,6 +31,7 @@ from ..ws_media import (
     OutQueue,
     hub,
     parse_frame,
+    unpack_flags,
     room_members,
     writer_loop,
 )
@@ -151,17 +152,33 @@ async def _serve_channel(ws: WebSocket, channel: str) -> None:
                     continue
 
                 room_mode = bool(flags & FLAG_ROOM)
+                _, is_last, stream = unpack_flags(flags)
+
+                # Файлы идут через квоту (transfer_max_files_per_user): лишние
+                # вежливо не пропускаем — файл одноразовый, попросят ещё раз.
+                if kind == KIND_FILE:
+                    fkey = target if room_mode else 0
+                    if not hub.admit_file(user_id, stream, fkey):
+                        continue
+                else:
+                    stream = 0
+
                 if room_mode:
                     mset = members.get(target)
-                    if mset is None:
-                        continue
-                    if user_id not in mset:
-                        continue  # не участник — молча игнорируем
+                    if mset is None or user_id not in mset:
+                        if kind == KIND_FILE:
+                            hub.close_file(user_id, stream, target)
+                        continue  # не комната / не участник
                     relayed += hub.relay_to_room(target, mset, user_id, kind, flags, payload)
                 else:
                     if target == user_id:
+                        if kind == KIND_FILE:
+                            hub.close_file(user_id, stream, 0)
                         continue  # эхо себе не нужно
                     relayed += hub.relay_to_user(target, kind, flags, user_id, payload)
+
+                if kind == KIND_FILE and is_last:
+                    hub.close_file(user_id, stream, target if room_mode else 0)
 
             # буфер не должен расти бесконечно: если кто-то шлёт заголовки без payload
             if len(buf) > settings.media_max_frame + HDR_SIZE:
@@ -180,6 +197,8 @@ async def _serve_channel(ws: WebSocket, channel: str) -> None:
             flush=True,
         )
         hub.remove(conn)
+        if channel == "transfer":
+            hub.drop_user_files(user_id)
         conn.q.clear()
         if conn.writer is not None:
             conn.writer.cancel()
@@ -209,4 +228,10 @@ async def ws_stats() -> dict:
     Помогает понять, упираемся ли мы в туннель (relay растёт, dropped 0)
     или в клиент/сеть (dropped растёт).
     """
-    return {"media": hub.stats()["media"], "transfer": hub.stats()["transfer"]}
+    s = hub.stats()
+    return {
+        "media": s["media"],
+        "transfer": s["transfer"],
+        "file_streams": s["file_streams"],
+        "quota_rejects": s["quota_rejects"],
+    }
