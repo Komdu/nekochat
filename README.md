@@ -1,6 +1,7 @@
 # nekochat
 ws-only (может быть) платформа для чатов
 ![nekochat](https://github.com/Komdu/nekochat/blob/main/assets/banner.png?raw=true)
+![screenshot](https://github.com/Komdu/nekochat/blob/main/assets/screenshot.png?raw=true)
 
 nekochat это штука что бы чатится, звонить и т.д.
 
