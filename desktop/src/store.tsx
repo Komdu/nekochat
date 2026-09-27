@@ -73,6 +73,24 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null);
 
+/** Поднимает бинарный медиа-сокет и прокидывает кадры в движок звонков.
+ *  Аудио/видео идут мимо JSON-канала /ws — отдельным сокетом с приоритетными
+ *  очередями на сервере (см. app/ws_media.py). Если сокет не поднялся, движок
+ *  сам откатится на старый JSON-путь. */
+function wireMedia(api: ApiClient, engine: () => CallEngine | null): void {
+  api.onWsMedia = (kind, flags, from, payload) => {
+    engine()?.handleMedia(kind, flags, from, payload);
+  };
+  api.onWsMediaLost = () => {
+    // голосовой канал это переживает: сокет поднимется, CallEngine переанонсирует
+    engine()?.onTransportBack?.();
+  };
+  api.onWsMediaReconnected = () => {
+    engine()?.onTransportBack?.();
+  };
+  api.wsMediaOpen("media");
+}
+
 export function useStore(): Store {
   const s = useContext(Ctx);
   if (!s) throw new Error("useStore вне Provider");
@@ -316,6 +334,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [appendMsg, refreshConvs]);
 
   const logout = useCallback((reason?: string) => {
+    apiRef.current?.wsMediaClose();
     apiRef.current?.wsClose();
     apiRef.current = null;
     callRef.current?.destroy();
@@ -396,6 +415,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [noteMsg]);
 
   // создать движок звонков для текущего api (meId известен после логина/восстановления)
+  // привязать стенд бинарного сокета к уже созданному движку (boot-путь)
+  const attachEngineMedia = useCallback((api: ApiClient) => {
+    const eng = callRef.current;
+    if (eng) eng.mediaSink = (kind, flags, target, payload) => api.sendMedia(kind, flags, target, payload);
+  }, []);
+
   const ensureCallEngine = useCallback((meId: number) => {
     const api = apiRef.current;
     if (!api) return;
@@ -403,6 +428,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     callRef.current = null;
     const engine = new CallEngine(meId, (m) => api.sendCallSignal(m));
     engine.wsStateGetter = () => api.wsReady();
+    // аудио/видео — в бинарный сокет; sendMedia сам вернёт false, если он не готов
+    engine.mediaSink = (kind, flags, target, payload) => api.sendMedia(kind, flags, target, payload);
     engine.onState = (s) => setCall(s);
     callRef.current = engine;
   }, []);
@@ -417,6 +444,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (m) noteMsg(m);
     };
     api.onAuthFailed = (m) => logout(`Сессия истекла: ${m}`);
+    wireMedia(api, () => callRef.current);
     apiRef.current = api;
     setBusy(true);
     try {
@@ -429,6 +457,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMe(user);
       setPhase("ready");
       ensureCallEngine(user.id);
+      attachEngineMedia(api);
+      api.wsMediaOpen("media");
       await loadData(true);
     } catch (e) {
       apiRef.current = null;
@@ -448,6 +478,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (m) noteMsg(m);
     };
     api.onAuthFailed = (m) => logout(`Сессия истекла: ${m}`);
+    wireMedia(api, () => callRef.current);
     apiRef.current = api;
     setBusy(true);
     try {
@@ -460,6 +491,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMe(user);
       setPhase("ready");
       ensureCallEngine(user.id);
+      attachEngineMedia(api);
+      api.wsMediaOpen("media");
       await loadData(true);
     } catch (e) {
       apiRef.current = null;
@@ -590,6 +623,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (m) noteMsg(m);
     };
     api.onAuthFailed = (m) => logout(`Сессия истекла: ${m}`);
+    wireMedia(api, () => callRef.current);
     apiRef.current = api;
     meRef.current = savedUser;
     setMe(savedUser);
@@ -613,6 +647,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         saveJson(LS.user, u);
         setMe(u);
         setPhase("ready");
+        attachEngineMedia(api);
+        api.wsMediaOpen("media");
         return loadData(true);
       })
       .catch((e) => {

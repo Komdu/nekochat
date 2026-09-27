@@ -5,6 +5,45 @@ import * as nats from "nats.ws";
 /** Сколько времени полной тишины (наши пинги идут, ответа нет) считаем «мёртвым» соединением. */
 const WS_SILENT_MS = 45000;
 
+// ---- бинарные медиа-кадры (зеркалим app/ws_media.py) ----
+// 0 ver | 1 kind | 2..4 flags | 4..8 target|from_id | 8..12 length | payload
+export const MK_AUDIO = 1;
+export const MK_VIDEO = 2;
+export const MK_FILE = 3;
+export const MFLAG_ROOM = 1 << 0;
+const MHDR = 12;
+const MVER = 1;
+
+/** Собрать бинарный кадр. payload копируется в пределах буфера — без base64. */
+export function packMedia(kind: number, flags: number, target: number, payload: Uint8Array): Uint8Array {
+  const out = new Uint8Array(MHDR + payload.byteLength);
+  const dv = new DataView(out.buffer);
+  dv.setUint8(0, MVER);
+  dv.setUint8(1, kind);
+  dv.setUint16(2, flags, true);
+  dv.setUint32(4, target >>> 0, true);
+  dv.setUint32(8, payload.byteLength, true);
+  out.set(payload, MHDR);
+  return out;
+}
+
+/** Разобрать бинарный кадр. null — данных пока недостаточно (ждём остаток). */
+export function unpackMedia(
+  buf: ArrayBuffer,
+): { kind: number; flags: number; from: number; payload: Uint8Array } | null {
+  if (buf.byteLength < MHDR) return null;
+  const dv = new DataView(buf);
+  const ver = dv.getUint8(0);
+  if (ver !== MVER) throw new Error("медиа: версия " + ver);
+  const kind = dv.getUint8(1);
+  const flags = dv.getUint16(2, true);
+  const from = dv.getUint32(4, true);
+  const len = dv.getUint32(8, true);
+  const end = MHDR + len;
+  if (buf.byteLength < end) return null;
+  return { kind, flags, from, payload: new Uint8Array(buf, MHDR, len) };
+}
+
 export class ApiClient {
   base: string;
   token: string | null = null;
@@ -33,6 +72,18 @@ export class ApiClient {
   private wsPending: Record<string, unknown>[] = [];
   onWs: ((ev: WsEvent) => void) | null = null;
   onWsError: ((msg: string) => void) | null = null;
+  // --- бинарные каналы: медиа (аудио/видео) и файлы ---
+  // Живут отдельно от /ws, чтобы поток кадров не вставал в очередь рядом с
+  // сообщениями и присутствием (см. app/ws_media.py).
+  private wsMedia: WebSocket | null = null;
+  private wsMediaDesired = false;
+  private wsMediaRetryTimer: number | null = null;
+  private wsMediaRetryAttempts = 0;
+  private wsMediaOpenedAt = 0;
+  private wsMediaLostFlag = false;
+  onWsMedia: ((kind: number, flags: number, from: number, payload: Uint8Array) => void) | null = null;
+  onWsMediaLost: (() => void) | null = null;
+  onWsMediaReconnected: (() => void) | null = null;
   onWsLost: (() => void) | null = null;
   onWsReconnected: (() => void) | null = null;
   onAuthFailed: ((msg: string) => void) | null = null;
@@ -378,6 +429,146 @@ export class ApiClient {
     const base = Math.min(1000 * Math.pow(2, Math.min(this.wsRetryAttempts, 2)), 4000);
     this.wsRetryAttempts++;
     return base + Math.floor(Math.random() * 300);
+  }
+
+  // ---------------- бинарный медиа-сокет ----------------
+
+  private mediaUrl(channel: "media" | "transfer"): string {
+    return (
+      this.base.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:") +
+      "/ws/" + channel + "?token=" + encodeURIComponent(this.token || "")
+    );
+  }
+
+  /** Открыть/переподключить медиа-сокет. Только для транспорта ws (остальные — как раньше). */
+  wsMediaOpen(channel: "media" | "transfer" = "media", reset = true): void {
+    if (this.transport !== "ws") return; // http/nats-транспорты шлют медиа как раньше, в /ws
+    const key = channel === "transfer" ? "wsFile" : "wsMedia";
+    const cur = (this as unknown as Record<string, WebSocket | null>)[key];
+    if (cur && cur.readyState === WebSocket.OPEN) return;
+    if (cur) {
+      try {
+        cur.onclose = null;
+        cur.close();
+      } catch {
+        /* noop */
+      }
+      (this as unknown as Record<string, WebSocket | null>)[key] = null;
+    }
+    if (!this.token) {
+      this.wsMediaDesired = false;
+      return;
+    }
+    this.wsMediaDesired = true;
+    this.clearMediaRetry();
+    if (reset) {
+      this.wsMediaRetryAttempts = 0;
+    }
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(this.mediaUrl(channel));
+    } catch {
+      this.scheduleMediaRetry(channel);
+      return;
+    }
+    ws.binaryType = "arraybuffer";
+    (this as unknown as Record<string, WebSocket | null>)[key] = ws;
+    const hsTimer = window.setTimeout(() => {
+      if (ws.readyState === WebSocket.CONNECTING) {
+        try {
+          ws.close();
+        } catch {
+          /* noop */
+        }
+      }
+    }, 10000);
+    ws.onopen = () => {
+      window.clearTimeout(hsTimer);
+      this.wsMediaOpenedAt = Date.now();
+      if (this.wsMediaLostFlag) {
+        this.wsMediaLostFlag = false;
+        this.onWsMediaReconnected?.();
+      }
+    };
+    ws.onmessage = (e) => {
+      if (typeof e.data === "string") return; // на бинарном сокете JSON-текста быть не должно
+      try {
+        const f = unpackMedia(e.data as ArrayBuffer);
+        if (f) this.onWsMedia?.(f.kind, f.flags, f.from, f.payload);
+      } catch {
+        /* мусорный кадр — пропускаем */
+      }
+    };
+    ws.onerror = () => {
+      /* onclose отработает следом и поднимет ретрай */
+    };
+    ws.onclose = () => {
+      window.clearTimeout(hsTimer);
+      if (this.wsMedia === ws) this.wsMedia = null;
+      if (this.wsMediaOpenedAt) this.wsMediaLostFlag = true;
+      this.onWsMediaLost?.();
+      if (this.wsMediaDesired) this.scheduleMediaRetry(channel);
+    };
+  }
+
+  private scheduleMediaRetry(channel: "media" | "transfer"): void {
+    if (this.wsMediaRetryTimer != null) return;
+    const base = Math.min(1000 * Math.pow(2, Math.min(this.wsMediaRetryAttempts, 2)), 4000);
+    this.wsMediaRetryAttempts++;
+    this.wsMediaRetryTimer = window.setTimeout(() => {
+      this.wsMediaRetryTimer = null;
+      this.wsMediaOpen(channel, false);
+    }, base + Math.floor(Math.random() * 300));
+  }
+
+  private clearMediaRetry(): void {
+    if (this.wsMediaRetryTimer != null) {
+      window.clearTimeout(this.wsMediaRetryTimer);
+      this.wsMediaRetryTimer = null;
+    }
+  }
+
+  wsMediaClose(): void {
+    this.wsMediaDesired = false;
+    this.clearMediaRetry();
+    const cur = this.wsMedia;
+    this.wsMedia = null;
+    if (cur) {
+      try {
+        cur.onclose = null;
+        cur.close();
+      } catch {
+        /* noop */
+      }
+    }
+  }
+
+  /** Отправить бинарный кадр. Молча отбрасывается, если сокет не готов:
+   *  для медио это нормально (кадр 20 мс), для файлов — файл перезапустится. */
+  sendMedia(kind: number, flags: number, target: number, payload: Uint8Array): boolean {
+    const ws = this.wsMedia;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(packMedia(kind, flags, target, payload));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Отправить служебный JSON по медиа-сокету (ошибки квот и т.п.). */
+  sendMediaJson(payload: unknown): void {
+    const ws = this.wsMedia;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      ws.send(JSON.stringify(payload));
+    } catch {
+      /* noop */
+    }
+  }
+
+  get mediaReady(): boolean {
+    return !!this.wsMedia && this.wsMedia.readyState === WebSocket.OPEN;
   }
 
   private wsSend(payload: unknown): void {

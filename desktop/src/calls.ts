@@ -9,6 +9,7 @@
 //     (на один общий AudioContext, каждая чужая речь — свой декодер + буфер).
 
 import type { WsEvent } from "./types";
+import { MK_AUDIO, MK_VIDEO, MFLAG_ROOM } from "./api";
 
 export type CallPhase = "idle" | "outgoing" | "incoming" | "connecting" | "active" | "ended";
 
@@ -37,6 +38,9 @@ export interface CallState {
 
 /** Один собеседник в активном звонке/канале: декодер + джиттер-буфер + планировщик. */
 interface RemotePeer {
+  /** счётчик кадров на приёме: в JSON-пути seq ехал в сообщении, в бинарном
+   *  фрейме для него нет места — ведём сами, чтобы таймстемп не поехал */
+  rxSeq: number;
   decoder: AudioDecoder | null;
   decBuffer: AudioBuffer[];
   nextTime: number | null;
@@ -47,6 +51,7 @@ interface RemotePeer {
 
 /** Демонстрация экрана одного из участников: декодер + холст. */
 interface RemoteScreen {
+  rxSeq: number;
   decoder: VideoDecoder | null;
   canvas: HTMLCanvasElement | null;
 }
@@ -153,9 +158,23 @@ export class CallEngine {
 
   onState: (s: CallState) => void = () => {};
 
+  /** Бинарный канал для аудио/видео. null -> работаем по старому JSON-пути.
+   *  Стенд ставит store.tsx (api.sendMedia). */
+  mediaSink: ((kind: number, flags: number, target: number, payload: Uint8Array) => boolean) | null = null;
+
   constructor(meId: number, signal: (msg: Record<string, unknown>) => void) {
     this.meId = meId;
     this.signal = signal;
+  }
+
+  /** Отправить кадр бинарно. false — сокет не готов: вызывающий решает
+   *  (фолбэк на /ws или дроп). */
+  private sendMediaFrame(kind: number, payload: Uint8Array): boolean {
+    const sink = this.mediaSink;
+    if (!sink) return false;
+    if (this.roomId != null) return sink(kind, MFLAG_ROOM, this.roomId, payload);
+    if (this.peerId != null) return sink(kind, 0, this.peerId, payload);
+    return false;
   }
 
   get current(): CallState {
@@ -175,6 +194,45 @@ export class CallEngine {
 
   private emit(): void {
     this.onState({ ...this.state });
+  }
+
+  /** Входящий бинарный кадр из /ws/media.
+   *
+   *  В 4-байтовом слоте кадра сервер кладёт id ОТПРАВИТЕЛЯ (не адресата), так что
+   *  собеседник известен всегда — и для 1-1, и для голосового канала. Флаг
+   *  MFLAG_ROOM означает только «это broadcast по комнате».
+   */
+  handleMedia(kind: number, flags: number, from: number, payload: Uint8Array): void {
+    if (this.state.phase !== "active" && this.state.phase !== "connecting") return;
+    if (this.roomId == null && this.peerId == null) return;
+    if (from <= 0 || from === this.meId) return; // эхо себе не играем
+
+    if (kind === MK_AUDIO) {
+      this.addParticipant(from); // догоняем участника, чей анонс могли пропустить
+      const peer = this.ensurePeer(from);
+      if (!peer.decoder || peer.decoder.state !== "configured") return;
+      try {
+        peer.decoder.decode(
+          new EncodedAudioChunk({ type: "key", timestamp: peer.rxSeq++ * FRAME_US, data: payload }),
+        );
+      } catch {
+        /* битый кадр — пропускаем */
+      }
+      return;
+    }
+
+    if (kind === MK_VIDEO) {
+      const scr = this.screens.get(from);
+      if (!scr || !scr.decoder || scr.decoder.state !== "configured") return;
+      if (this.state.phase !== "active") return;
+      try {
+        scr.decoder.decode(
+          new EncodedVideoChunk({ type: "key", timestamp: scr.rxSeq++ * 33_000, data: payload }),
+        );
+      } catch {
+        /* битый кадр */
+      }
+    }
   }
 
   private setState(patch: Partial<CallState>): void {
@@ -287,15 +345,19 @@ export class CallEngine {
           if (this.roomId == null && this.peerId == null) return;
           const bytes = new Uint8Array(chunk.byteLength);
           chunk.copyTo(bytes);
-          const sig: Record<string, unknown> = {
-            type: "call_audio",
-            call_id: this.callId,
-            seq: callSeq++,
-            audio: b64encode(bytes),
-          };
-          if (this.roomId != null) sig.room_id = this.roomId;
-          else sig.to_id = this.peerId!;
-          this.signal(sig);
+          // основной путь — бинарный кадр: на 33% меньше трафика и без base64.
+          // Сокет не готов -> откатываемся на /ws, чтобы не терять звук.
+          if (!this.sendMediaFrame(MK_AUDIO, bytes)) {
+            const sig: Record<string, unknown> = {
+              type: "call_audio",
+              call_id: this.callId,
+              seq: callSeq++,
+              audio: b64encode(bytes),
+            };
+            if (this.roomId != null) sig.room_id = this.roomId;
+            else sig.to_id = this.peerId!;
+            this.signal(sig);
+          }
           if (this.dbSent % 50 === 0) {
             this.dbg({ ev: "enc_out", sent: this.dbSent, enc: this.encoder ? this.encoder.state : "none" });
           }
@@ -475,7 +537,7 @@ export class CallEngine {
   private ensurePeer(id: number): RemotePeer {
     let p = this.peers.get(id);
     if (!p) {
-      p = { decoder: null, decBuffer: [], nextTime: null, decIn: 0, decPlayed: 0, decFirst: false };
+      p = { rxSeq: 0, decoder: null, decBuffer: [], nextTime: null, decIn: 0, decPlayed: 0, decFirst: false };
       this.peers.set(id, p);
     }
     if (!p.decoder && this.codecsOk()) {
@@ -1031,16 +1093,21 @@ export class CallEngine {
         const bytes = new Uint8Array(chunk.byteLength);
         chunk.copyTo(bytes);
         this.screenBytes += bytes.byteLength;
-        const sig: Record<string, unknown> = {
-          type: "screen_frame",
-          call_id: this.callId,
-          seq: this.screenSeq++,
-          key: chunk.type === "key",
-          data: b64encode(bytes),
-        };
-        if (this.roomId != null) sig.room_id = this.roomId;
-        else sig.to_id = this.peerId!;
-        this.signal(sig);
+        // видео — тоже бинарным кадром: на 33% меньше трафика и без base64.
+        // Сокет не готов -> откат на /ws, чтобы демка не рассыпалась.
+        this.screenSeq++;
+        if (!this.sendMediaFrame(MK_VIDEO, bytes)) {
+          const sig: Record<string, unknown> = {
+            type: "screen_frame",
+            call_id: this.callId,
+            seq: this.screenSeq,
+            key: chunk.type === "key",
+            data: b64encode(bytes),
+          };
+          if (this.roomId != null) sig.room_id = this.roomId;
+          else sig.to_id = this.peerId!;
+          this.signal(sig);
+        }
         // каждые ~120 кадров ключевой (чтобы входящий мог «догнать»)
         if (this.screenSeq % 150 === 0) this.screenForceKey = true;
       },
@@ -1106,7 +1173,7 @@ export class CallEngine {
       error: () => undefined,
     });
     dec.configure({ codec });
-    this.screens.set(from, { decoder: dec, canvas: null });
+    this.screens.set(from, { rxSeq: 0, decoder: dec, canvas: null });
   }
 
   private drawScreenFrame(from: number, frame: VideoFrame): void {
