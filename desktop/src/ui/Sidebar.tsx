@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useStore } from "../store";
 import { Avatar } from "./Avatar";
 import { Tile } from "./Tile";
+import { Icon } from "./Icon";
 
 export function Sidebar() {
   const { me, rooms, convs, users, usersMap, online, current, selectRoom, selectUser, logout, refreshData, base } =
@@ -43,7 +44,7 @@ export function Sidebar() {
           <div className="server-sub">комнаты и личные сообщения</div>
         </div>
         <button className="icon-btn side-refresh" title="Обновить" onClick={() => refreshData(false)}>
-          ⟳
+          <Icon name="refresh" />
         </button>
       </div>
 
@@ -107,7 +108,7 @@ export function Sidebar() {
 
       <div className="side-foot">
         <button className="icon-btn" title="Выйти" onClick={() => logout()}>
-          ⏻
+          <Icon name="power" />
         </button>
         <span className="server-url">{host}</span>
       </div>

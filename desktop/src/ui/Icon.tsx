@@ -1,0 +1,62 @@
+// Единый набор значков вместо эмодзи: тонкие линии, currentColor —
+// одинаково читаются в тёмной и светлой темах и не зависят от шрифта.
+
+const PATHS: Record<string, string> = {
+  menu: "M4 7h16M4 12h16M4 17h16",
+  phone:
+    "M6.4 3.5h2.8l1.6 4-2.1 1.6a12.4 12.4 0 0 0 6.2 6.2l1.6-2.1 4 1.6v2.8a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.4 5.7a2 2 0 0 1 2-2.2z",
+  mail: "M3.5 6.5h17v11h-17zM3.5 7.5l8.5 6 8.5-6",
+  plus: "M12 5.5v13M5.5 12h13",
+  user:
+    "M12 11.6a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4zM4.8 20a7.2 7.2 0 0 1 14.4 0",
+  userPlus:
+    "M9.6 11.4a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3.4 20a6.2 6.2 0 0 1 9.2-5.4M18.5 14v6M15.5 17h6",
+  users:
+    "M9.4 11.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8zM2.8 19.4a6.6 6.6 0 0 1 13.2 0M16 5.2a3.4 3.4 0 0 1 0 6.6M17.4 13.6a6.6 6.6 0 0 1 3.8 5.8",
+  settings:
+    "M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zM12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7",
+  refresh: "M20 12a8 8 0 1 1-2.4-5.7M20 4.4V9h-4.6",
+  power: "M12 3.5v8M7.4 6.1a7.6 7.6 0 1 0 9.2 0",
+  mic: "M12 4.2a2.6 2.6 0 0 1 2.6 2.6v5a2.6 2.6 0 0 1-5.2 0v-5A2.6 2.6 0 0 1 12 4.2zM6 11.4a6 6 0 0 0 12 0M12 17.4v3.2M9 20.6h6",
+  micOff:
+    "M9.2 5.1A2.6 2.6 0 0 1 14.6 6.8v4.4M9.4 9.6v3.2a2.6 2.6 0 0 0 4.4 1.9M6 11.4a6 6 0 0 0 9.2 5.1M18 11.4v.6M12 17.4v3.2M9 20.6h6M4 4l16 16",
+  monitor: "M3.5 5.5h17v10h-17zM9 19.5h6M12 15.5v4",
+  stop: "M7.5 7.5h9v9h-9z",
+  close: "M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8",
+  check: "M5 12.6l4.6 4.6L19 7.4",
+  palette:
+    "M12 3.6a8.4 8.4 0 0 0 0 16.8c1.4 0 2-1 2-2 0-1.5-1.5-1.7-1.5-3 0-1 .8-1.7 1.8-1.7h1.4a4.7 4.7 0 0 0 4.7-4.7c0-3-3.8-5.4-8.4-5.4zM7.6 12.2h.01M9.6 8.4h.01M14 7.6h.01",
+  arrow: "M5 12h14M13.2 6l6 6-6 6",
+  search: "M11 4.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8zM15.8 15.8l4 4",
+};
+
+export type IconName = keyof typeof PATHS | string;
+
+export function Icon({
+  name,
+  size = 18,
+  className = "",
+}: {
+  name: IconName;
+  size?: number;
+  className?: string;
+}) {
+  const d = PATHS[name] || PATHS.plus;
+  return (
+    <svg
+      className={"ico " + className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={d} />
+    </svg>
+  );
+}

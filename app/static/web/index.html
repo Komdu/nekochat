@@ -468,17 +468,20 @@
       --taskbar-h: 28px;
       --chat-bg: #1a1a1a;  --bar-bg: #151515;
       --bubble-bg: #212121; --bubble-border: #d8d8d8; --bubble-text: #f3f3f3;
+      --bubble-mine-bg: #2b2b2b; --bubble-mine-border: #f0f0f0;
       --hairline: #383838;  --chip-active-bg: #2f2f2f; --chip-text: #dcdcdc;
     }
     html[data-theme="material"] { --taskbar-h: 0px; }
     html[data-mode="light"] {
       --chat-bg: #f4f4f4;  --bar-bg: #e9e9e9;
       --bubble-bg: #ffffff; --bubble-border: #cfcfcf; --bubble-text: #1a1a1a;
+      --bubble-mine-bg: #efefef; --bubble-mine-border: #9a9a9a;
       --hairline: #dcdcdc;  --chip-active-bg: #dcdcdc; --chip-text: #333333;
     }
     html[data-theme="win98"] {
       --chat-bg: var(--face); --bar-bg: var(--face);
       --bubble-bg: #ffffc1; --bubble-border: #808080; --bubble-text: #000000;
+      --bubble-mine-bg: #d4d0c8; --bubble-mine-border: #404040;
       --hairline: #808080;  --chip-active-bg: #000080; --chip-text: #000000;
     }
     html[data-theme="material"] #taskbar { display: none; }
@@ -541,22 +544,10 @@
     .msg-body {
       position: relative; min-width: 0;
       background: var(--bubble-bg); border: 1.5px solid var(--bubble-border);
-      border-radius: 16px 16px 16px 5px; padding: 6px 12px 7px;
+      border-radius: 16px; padding: 6px 12px 7px;
     }
-    .msg.mine .msg-body { border-radius: 16px 16px 5px 16px; }
-    .msg-body::after, .msg-body::before { content: ""; position: absolute; width: 0; height: 0; }
-    .msg-body::after {
-      bottom: -9px; left: 11px;
-      border-left: 8px solid transparent; border-right: 8px solid transparent;
-      border-bottom: 10px solid var(--bubble-border);
-    }
-    .msg-body::before {
-      bottom: -4px; left: 13px;
-      border-left: 6px solid transparent; border-right: 6px solid transparent;
-      border-bottom: 5px solid var(--bubble-bg);
-    }
-    .msg.mine .msg-body::after { left: auto; right: 11px; }
-    .msg.mine .msg-body::before { left: auto; right: 13px; }
+    /* свои сообщения — вправо и чуть светлее, хвостиков нет */
+    .msg.mine .msg-body { background: var(--bubble-mine-bg); border-color: var(--bubble-mine-border); }
     .msg .author { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }
     .msg .sender { font-size: 12px; font-weight: bold; color: var(--bubble-text); }
     .msg .time { font-size: 11px; color: var(--muted); margin-left: auto; align-self: auto; }
@@ -583,8 +574,14 @@
     .appbar-rooms::-webkit-scrollbar { height: 0; }
     .appbar-right { display: flex; align-items: center; gap: 10px; flex: none; }
     .appbar-me { font-size: 14px; font-weight: 600; color: var(--bubble-text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .appbar-dot { width: 15px; height: 15px; background: #3a3a3a; border: none; flex: none; }
-    .appbar-dot.on { background: #35d07f; }
+    /* зелёный квадратик заменён аватаркой: у неё свой индикатор «в сети» */
+    .appbar-avatar { position: relative; width: 26px; height: 26px; flex: none; cursor: pointer; }
+    .appbar-avatar .avatar { width: 26px; height: 26px; font-size: 12px; }
+    .appbar-avatar-dot {
+      position: absolute; right: -1px; bottom: -1px;
+      width: 8px; height: 8px; background: #35d07f;
+      border: 2px solid var(--bar-bg);
+    }
     .appbar-btn { padding: 3px 9px; font-size: 15px; line-height: 1.2; }
     .room-chip {
       display: inline-flex; align-items: center; gap: 6px; flex: none;
@@ -605,6 +602,16 @@
     .ptile-btn.off .ptile-el { border-color: #5c5c5c; filter: saturate(.45) brightness(.8); }
     .ptile-add { width: 30px; height: 30px; border-radius: 8px; border: 1.5px dashed #6a6a6a; color: #9a9a9a; align-items: center; justify-content: center; font-size: 16px; }
     .chat-placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); flex: 1; }
+
+    /* --- значки (вместо эмодзи) --- */
+    .ico { display: inline-block; vertical-align: middle; flex: none; }
+    .theme-btn, .drawer-close, .appbar-btn, .icon-call, .ptile-add, .room-chip.add {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .send-btn .ico, .mute-btn .ico { vertical-align: -2px; margin-right: 5px; }
+    .call-info .ico { margin-right: 6px; }
+    .ico-slot { display: inline-flex; align-items: center; color: var(--muted); }
+    .list-tick { color: var(--ok); display: inline-flex; align-items: center; }
 
     @media (max-width: 720px) { .room-chip .rname { display: none; } }
   </style>
@@ -914,10 +921,10 @@
         <div class="sidebar-header">
           <div class="logo"><img src="/icon.png" class="logo-img" alt="logo" /><span>nekochat</span></div>
           <div class="user-box">
-            <button id="theme-btn" class="theme-btn" data-t-title="theme_title" title="Оформление">🎨</button>
+            <button id="theme-btn" class="theme-btn" data-t-title="theme_title" title="Оформление"></button>
             <div style="text-align:right;cursor:pointer" id="me-box"><div class="name" id="me-name"></div><div style="font-size:11px;color:var(--muted)" id="me-user"></div><div style="font-size:10px;color:var(--muted)" id="me-status"></div></div>
             <div class="avatar" id="me-avatar" data-t-title="profile_title" title="Профиль"></div>
-            <button class="drawer-close" id="drawer-close" data-t-title="close_title" title="Закрыть">✕</button>
+            <button class="drawer-close" id="drawer-close" data-t-title="close_title" title="Закрыть"></button>
           </div>
         </div>
         <input type="file" id="avatar-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" />
@@ -938,8 +945,7 @@
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <button class="call-btn icon-call" id="call-btn" data-no-md data-t-title="btn_call_title" title="Голосовой чат" style="display:none">📞</button>
-            <span class="sub" id="chat-sub"></span>
+            <button class="call-btn icon-call" id="call-btn" data-no-md data-t-title="btn_call_title" title="Голосовой чат" style="display:none"></button>            <span class="sub" id="chat-sub"></span>
           </div>
         </div>
         <div class="chat-placeholder" id="chat-placeholder" data-t="placeholder_select">Готово. Выберите комнату или диалог.</div>
@@ -960,9 +966,9 @@
           <div class="appbar-sep"></div>
           <div class="appbar-rooms" id="appbar-rooms"></div>
           <div class="appbar-right">
-            <button class="appbar-btn" id="drawer-toggle" data-t-title="channels_title" title="Каналы и люди">☰</button>
+            <button class="appbar-btn" id="drawer-toggle" data-t-title="channels_title" title="Каналы и люди"></button>
             <span class="appbar-me" id="appbar-me"></span>
-            <span class="appbar-dot on" id="appbar-dot"></span>
+            <span class="appbar-avatar" id="appbar-avatar"></span>
           </div>
         </div>
       </div>
@@ -1254,6 +1260,13 @@
       return `<span class="avatar ${cls} ${ring}"${st}>${avatarContent(u)}</span>`;
     }
     function renderMe() {
+      const av = $('#appbar-avatar');
+      if (av) {
+        av.innerHTML = avatarHtml(me, '') +
+          '<span class="appbar-avatar-dot"></span>';
+        av.title = me.display_name || me.username;
+        av.onclick = () => openProfile(me);
+      }
       $('#me-name').textContent = me.display_name;
       $('#me-user').textContent = '@' + me.username;
       $('#me-avatar').innerHTML = avatarContent(me);
@@ -1262,10 +1275,7 @@
       else $('#me-avatar').style.removeProperty('--ring');
       $('#me-status').textContent = me.status || '';
       $('#me-status').style.display = me.status ? '' : 'none';
-      if ($('#appbar-me')) {
-        $('#appbar-me').textContent = me.display_name || me.username;
-        $('#appbar-dot').classList.add('on');
-      }
+      if ($('#appbar-me')) $('#appbar-me').textContent = me.display_name || me.username;
     }
     async function uploadAvatar(file) {
       if (!file) return;
@@ -1564,7 +1574,7 @@
               <div class="title">${esc(u.display_name)}</div>
               <div class="meta">@${esc(u.username)}</div>
             </div>
-            ${conv ? `<div style="font-size:11px;color:#555">✓</div>` : ''}`;
+            ${conv ? `<span class="list-tick">${ico('check', 13)}</span>` : ''}`;
           el.onclick = () => openDM(u);
           list.appendChild(el);
         });
@@ -1689,6 +1699,35 @@
       c.scrollTop = c.scrollHeight;
     }
 
+    // ---------- значки (вместо эмодзи) ----------
+    const ICO = {
+      menu: 'M4 7h16M4 12h16M4 17h16',
+      phone: 'M6.4 3.5h2.8l1.6 4-2.1 1.6a12.4 12.4 0 0 0 6.2 6.2l1.6-2.1 4 1.6v2.8a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.4 5.7a2 2 0 0 1 2-2.2z',
+      mail: 'M3.5 6.5h17v11h-17zM3.5 7.5l8.5 6 8.5-6',
+      plus: 'M12 5.5v13M5.5 12h13',
+      user: 'M12 11.6a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4zM4.8 20a7.2 7.2 0 0 1 14.4 0',
+      userPlus: 'M9.6 11.4a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3.4 20a6.2 6.2 0 0 1 9.2-5.4M18.5 14v6M15.5 17h6',
+      settings: 'M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zM12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7',
+      refresh: 'M20 12a8 8 0 1 1-2.4-5.7M20 4.4V9h-4.6',
+      power: 'M12 3.5v8M7.4 6.1a7.6 7.6 0 1 0 9.2 0',
+      mic: 'M12 4.2a2.6 2.6 0 0 1 2.6 2.6v5a2.6 2.6 0 0 1-5.2 0v-5A2.6 2.6 0 0 1 12 4.2zM6 11.4a6 6 0 0 0 12 0M12 17.4v3.2M9 20.6h6',
+      micOff: 'M9.2 5.1A2.6 2.6 0 0 1 14.6 6.8v4.4M9.4 9.6v3.2a2.6 2.6 0 0 0 4.4 1.9M6 11.4a6 6 0 0 0 9.2 5.1M18 11.4v.6M12 17.4v3.2M9 20.6h6M4 4l16 16',
+      monitor: 'M3.5 5.5h17v10h-17zM9 19.5h6M12 15.5v4',
+      stop: 'M7.5 7.5h9v9h-9z',
+      close: 'M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8',
+      check: 'M5 12.6l4.6 4.6L19 7.4',
+      palette: 'M12 3.6a8.4 8.4 0 0 0 0 16.8c1.4 0 2-1 2-2 0-1.5-1.5-1.7-1.5-3 0-1 .8-1.7 1.8-1.7h1.4a4.7 4.7 0 0 0 4.7-4.7c0-3-3.8-5.4-8.4-5.4zM7.6 12.2h.01M9.6 8.4h.01M14 7.6h.01',
+      arrow: 'M5 12h14M13.2 6l6 6-6 6',
+      search: 'M11 4.6a6.4 6.4 0 1 0 0 12.8 6.4 6.4 0 0 0 0-12.8zM15.8 15.8l4 4',
+    };
+    function ico(name, size) {
+      const d = ICO[name] || ICO.plus;
+      const s = size || 18;
+      return '<svg class="ico" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="' + d + '"></path></svg>';
+    }
+
     // ---------- отправка ----------
     function autoGrow() {
       const ta = $('#msg-input');
@@ -1771,7 +1810,10 @@
     function setDrawer(open) {
       $('#app').classList.toggle('drawer-open', !!open);
     }
+    $('#drawer-toggle').innerHTML = ico('menu', 17);
+    $('#call-btn').innerHTML = ico('phone', 17);
     $('#drawer-toggle').addEventListener('click', () => setDrawer(!$('#app').classList.contains('drawer-open')));
+    $('#drawer-close').innerHTML = ico('close', 14);
     $('#drawer-close').addEventListener('click', () => setDrawer(false));
     $('#drawer-backdrop').addEventListener('click', () => setDrawer(false));
     document.addEventListener('keydown', e => {
@@ -1781,6 +1823,7 @@
 
     // ---------- theme switcher ----------
     $('#auth-theme-link').addEventListener('click', openTheme);
+    $('#theme-btn').innerHTML = ico('palette', 15);
     $('#theme-btn').addEventListener('click', openTheme);
     document.querySelectorAll('#theme-overlay input[type=radio]').forEach(r =>
       r.addEventListener('change', () => {
@@ -1934,15 +1977,17 @@
       $('#call-panel').style.display = 'none';
       $('#call-panel').innerHTML = '';
     }
+    function callBtn(id, label, cls, icon) {
+      return '<button class="send-btn ' + (cls || '') + '" id="' + id + '">' +
+        (icon ? ico(icon, 15) : '') + '<span>' + label + '</span></button>';
+    }
     function showCallActive(label, withScreen) {
-      const screenBtn = withScreen
-        ? '<button class="mute-btn" id="screen-btn">' + t('screen_share') + '</button>'
-        : '';
+      const screenBtn = withScreen ? callBtn('screen-btn', t('screen_share'), 'mute-btn', 'monitor') : '';
       callUi(callInfo(label) +
         '<div style="display:flex;gap:8px">' +
-        '<button class="mute-btn" id="mute-btn">' + (muted ? t('muted') : t('unmuted')) + '</button>' +
+        callBtn('mute-btn', muted ? t('muted') : t('unmuted'), 'mute-btn', muted ? 'micOff' : 'mic') +
         screenBtn +
-        '<button class="send-btn" id="call-end">' + t('btn_end_call') + '</button>' +
+        callBtn('call-end', t('btn_end_call'), '', 'phone') +
         '</div>');
       $('#mute-btn').addEventListener('click', toggleMute);
       const sb = $('#screen-btn');
@@ -1950,10 +1995,10 @@
       $('#call-end').addEventListener('click', () => hangup());
     }
     function showCallIncoming(label) {
-      callUi(callInfo(t('call_incoming') + label) +
+      callUi(callInfo(ico('phone', 15) + ' ' + t('call_incoming') + esc(label)) +
         '<div style="display:flex;gap:8px">' +
-        '<button class="send-btn" id="call-answer">' + t('btn_answer') + '</button>' +
-        '<button class="send-btn" id="call-decline">' + t('btn_decline') + '</button>' +
+        callBtn('call-answer', t('btn_answer')) +
+        callBtn('call-decline', t('btn_decline')) +
         '</div>');
       $('#call-answer').addEventListener('click', answerCall);
       $('#call-decline').addEventListener('click', () => {
@@ -1962,8 +2007,7 @@
       });
     }
     function showCallEnded(reason) {
-      callUi(callInfo(reason) +
-        '<button class="send-btn" id="call-end">' + t('btn_end_call') + '</button>');
+      callUi(callInfo(reason) + callBtn('call-end', t('btn_end_call')));
       $('#call-end').addEventListener('click', () => endCall(false, ''));
     }
 
@@ -2270,16 +2314,17 @@
       el.innerHTML = participants.map(p =>
         '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;min-width:200px">' +
         '<span class="status-badge online"></span><span>' + esc(userName(p.id)) + '</span>' +
-        (p.screen ? '<span>🖥</span>' : '') +
+        (p.screen ? '<span class="ico-slot">' + ico('monitor', 14) + '</span>' : '') +
         '</div>'
       ).join('');
     }
     function showChannelInvite(label) {
       callUi(
-        esc(t('call_incoming')) + ' <b>' + esc(label) + '</b> → ' + esc(t('voice_channel')) +
+        ico('phone', 15) + ' ' + esc(t('call_incoming')) + ' <b>' + esc(label) + '</b>' +
+        ico('arrow', 14) + ' ' + esc(t('voice_channel')) +
         '<div style="display:flex;gap:8px;margin-top:6px">' +
-        '<button class="send-btn" id="call-answer">' + esc(t('join_channel')) + '</button>' +
-        '<button class="send-btn" id="call-decline">' + esc(t('later')) + '</button>' +
+        callBtn('call-answer', esc(t('join_channel'))) +
+        callBtn('call-decline', esc(t('later'))) +
         '</div>'
       );
       $('#call-answer').addEventListener('click', answerCall);
@@ -2287,13 +2332,13 @@
     }
     function showChannelActive(label) {
       callUi(
-        '<b>' + esc(t('voice_channel')) + '</b>' +
+        ico('phone', 15) + ' <b>' + esc(t('voice_channel')) + '</b>' +
         '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px">' + label + '</div>' +
         '<div id="channel-members" style="min-width:190px"></div>' +
         '<div style="display:flex;gap:8px">' +
-        '<button class="mute-btn" id="mute-btn">' + (muted ? t('muted') : t('unmuted')) + '</button>' +
-        '<button class="mute-btn" id="screen-btn">' + esc(t('screen_share')) + '</button>' +
-        '<button class="send-btn" id="call-end">' + esc(t('btn_end_call')) + '</button>' +
+        callBtn('mute-btn', muted ? t('muted') : t('unmuted'), 'mute-btn', muted ? 'micOff' : 'mic') +
+        callBtn('screen-btn', esc(t('screen_share')), 'mute-btn', 'monitor') +
+        callBtn('call-end', esc(t('btn_end_call'))) +
         '</div>'
       );
       $('#mute-btn').addEventListener('click', toggleMute);

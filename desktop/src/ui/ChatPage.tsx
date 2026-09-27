@@ -3,6 +3,7 @@ import { useStore } from "../store";
 import { Sidebar } from "./Sidebar";
 import { Avatar } from "./Avatar";
 import { PTile } from "./PTile";
+import { Icon } from "./Icon";
 import { fmtTime } from "../format";
 import type { Msg, User } from "../types";
 import { SettingsDialog } from "./dialogs/SettingsDialog";
@@ -95,7 +96,7 @@ export function ChatPage() {
           />
         ))}
         <button className="ptile-btn ptile-add" title="Добавить участника" onClick={() => setDlg("member")}>
-          +
+          <Icon name="plus" size={16} />
         </button>
       </div>
 
@@ -114,16 +115,16 @@ export function ChatPage() {
           </button>
         ))}
         <button className="room-chip add" title="Создать комнату" onClick={() => setDlg("room")}>
-          +
+          <Icon name="plus" size={15} />
         </button>
       </div>
 
       <div className="appbar-right">
         <button className="icon-btn" title="Каналы и люди" onClick={() => setDrawer((v) => !v)}>
-          ☰
+          <Icon name="menu" />
         </button>
         <span className="appbar-me">{me?.display_name || me?.username || ""}</span>
-        <span className={"appbar-dot" + (me ? " on" : "")} title="в сети" />
+        <Avatar user={me} size={26} online className="appbar-me-avatar" />
       </div>
     </nav>
   );
@@ -147,7 +148,7 @@ export function ChatPage() {
                 else startRoomCall(Number(current.id));
               }}
             >
-              📞
+              <Icon name="phone" />
             </button>
           )}
           {sub && <span className="chat-sub">{sub}</span>}
@@ -190,14 +191,14 @@ export function ChatPage() {
           <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
           <aside className="drawer">
             <div className="drawer-actions">
-              <button className="icon-btn" title="Новые личные сообщения" onClick={() => setDlg("newdm")}>✉</button>
-              <button className="icon-btn" title="Создать комнату" onClick={() => setDlg("room")}>➕</button>
+              <button className="icon-btn" title="Новые личные сообщения" onClick={() => setDlg("newdm")}><Icon name="mail" /></button>
+              <button className="icon-btn" title="Создать комнату" onClick={() => setDlg("room")}><Icon name="plus" /></button>
               {current && current.kind === "room" && (
-                <button className="icon-btn" title="Добавить участника" onClick={() => setDlg("member")}>👤</button>
+                <button className="icon-btn" title="Добавить участника" onClick={() => setDlg("member")}><Icon name="userPlus" /></button>
               )}
-              <button className="icon-btn" title="Обновить" onClick={() => refreshData(false)}>⟳</button>
-              <button className="icon-btn" title="Профиль" onClick={() => setDlg("profile")}>☺</button>
-              <button className="icon-btn" title="Настройки" onClick={() => setDlg("settings")}>⚙</button>
+              <button className="icon-btn" title="Обновить" onClick={() => refreshData(false)}><Icon name="refresh" /></button>
+              <button className="icon-btn" title="Профиль" onClick={() => setDlg("profile")}><Icon name="user" /></button>
+              <button className="icon-btn" title="Настройки" onClick={() => setDlg("settings")}><Icon name="settings" /></button>
             </div>
             <Sidebar />
           </aside>

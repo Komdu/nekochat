@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store";
 import { Avatar } from "./Avatar";
+import { Icon } from "./Icon";
 
 function fmtDur(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -100,7 +101,7 @@ export function CallOverlay() {
                 <div key={p.id} className="call-member">
                   <Avatar user={u} size={32} className="call-avatar" />
                   <div className="call-member-name">{pname}</div>
-                  {p.screen && <div className="call-member-screen-tag">🖥</div>}
+                  {p.screen && <div className="call-member-screen-tag"><Icon name="monitor" size={16} /></div>}
                   <div className="call-member-dot" />
                 </div>
               );
@@ -140,7 +141,7 @@ export function CallOverlay() {
                 onClick={toggleMuteCall}
                 title="Микрофон"
               >
-                {muted ? "🔇" : "🎤"}
+                {muted ? <Icon name="micOff" size={17} /> : <Icon name="mic" size={17} />}
               </button>
               {call.phase === "active" && (
                 <button
@@ -151,7 +152,7 @@ export function CallOverlay() {
                   }}
                   title={call.screenOn ? "Остановить демонстрацию экрана" : "Демонстрация экрана"}
                 >
-                  {call.screenOn ? "⏹ 🖥" : "🖥"}
+                  {call.screenOn ? <><Icon name="stop" size={15} /> <Icon name="monitor" size={15} /></> : <Icon name="monitor" size={15} />}
                 </button>
               )}
               <button className="call-btn call-decline" onClick={() => hangupCall()}>
@@ -178,7 +179,7 @@ export function CallOverlay() {
           return (
             <div key={p.id} className="call-screen-panel">
               <div className="call-screen-head">
-                <span>🖥 {pname}</span>
+                <span className="call-screen-title"><Icon name="monitor" size={15} /> {pname}</span>
               </div>
               <canvas
                 ref={(el) => {
@@ -195,7 +196,7 @@ export function CallOverlay() {
         call.peerId != null && (
           <div className={"call-screen-panel" + (screenFull ? " full" : "")}>
             <div className="call-screen-head">
-              <span>🖥 Демонстрация экрана</span>
+              <span className="call-screen-title"><Icon name="monitor" size={15} /> Демонстрация экрана</span>
               <button className="call-btn call-neutral" onClick={() => setScreenFull(!screenFull)}>
                 {screenFull ? "Свернуть" : "На весь экран"}
               </button>
