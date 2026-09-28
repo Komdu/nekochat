@@ -2,6 +2,8 @@
   // Чат: список чатов слева, сообщения справа. Плоская тёмная тема.
   import { store } from "../lib/store.svelte";
   import { fmtTime } from "../lib/format";
+  import Avatar from "./Avatar.svelte";
+  import Icon from "./Icon.svelte";
 
   let draft = $state("");
 
@@ -23,15 +25,30 @@
     }
   }
 
-  function who(m: { sender_id?: number; user_id?: number; sender?: { display_name?: string | null; username?: string }; user?: { display_name?: string | null; username?: string } }): string {
-    const uid = m.sender_id ?? m.user_id;
+  // Автор сообщения. У комнатных сообщений сервер отдаёт только вложенный
+  // объект `user` (поля user_id нет), у личных — `sender`/`sender_id`.
+  // Поэтому проверяем все четыре варианта, иначе «мои» сообщения не
+  // отличаются от чужих и всё рисуется в одну сторону.
+  type AnyMsg = {
+    sender_id?: number;
+    user_id?: number;
+    sender?: { id?: number; display_name?: string | null; username?: string };
+    user?: { id?: number; display_name?: string | null; username?: string };
+  };
+
+  function authorId(m: AnyMsg): number | undefined {
+    return m.sender_id ?? m.user_id ?? m.sender?.id ?? m.user?.id;
+  }
+
+  function who(m: AnyMsg): string {
+    const uid = authorId(m);
     if (uid === store.me?.id) return store.me?.display_name || store.me?.username || "Я";
-    const u = (m.sender || m.user) as { display_name?: string | null; username?: string } | undefined;
+    const u = m.sender ?? m.user;
     return u?.display_name || u?.username || (uid != null ? "@" + uid : "?");
   }
 
-  function isMine(m: { sender_id?: number; user_id?: number }): boolean {
-    return (m.sender_id ?? m.user_id) === store.me?.id;
+  function isMine(m: AnyMsg): boolean {
+    return authorId(m) === store.me?.id;
   }
 </script>
 
@@ -41,9 +58,11 @@
       <span class="side-logo">#</span>
       <div class="side-server">
         <div class="server-name">nekochat</div>
-        <div class="server-sub">{store.users.length + 1} онлайн</div>
+        <div class="server-sub">{store.onlineCount} онлайн</div>
       </div>
-      <button class="icon-btn" title="Обновить" onclick={() => window.location.reload()}>⟳</button>
+      <button class="icon-btn" title="Обновить" onclick={() => window.location.reload()}>
+        <Icon name="refresh" size={16} />
+      </button>
     </div>
     <div class="list">
       {#each store.list as item (item.kind + item.id)}
@@ -66,8 +85,11 @@
       {/if}
     </div>
     <div class="side-foot">
+      <Avatar user={store.me} size={28} base={store.base} />
       <span class="me-name">{store.me?.display_name || store.me?.username}</span>
-      <button class="icon-btn" title="Выйти" onclick={() => store.logout()}>⏻</button>
+      <button class="icon-btn" title="Выйти" onclick={() => store.logout()}>
+        <Icon name="power" size={16} />
+      </button>
     </div>
   </aside>
 
@@ -77,6 +99,22 @@
         <div class="chat-title">
           <span class="chan-chip">{cur.kind === "room" ? "#" : "@"}</span>
           <span class="title-text">{cur.label.replace(/^[@#]\s*/, "")}</span>
+          {#if cur.kind === "dm" && store.usersMap[Number(cur.id)]}
+            <span class="online-dot" class:on={store.isOnline(store.usersMap[Number(cur.id)])}></span>
+          {/if}
+        </div>
+        <div class="head-actions">
+          <button
+            class="head-btn"
+            class:active={store.call?.roomId != null && String(store.call.roomId) === cur.id}
+            title={cur.kind === "room" ? "Голосовой канал" : "Позвонить"}
+            onclick={() => {
+              if (cur.kind === "room") store.joinRoomCall(Number(cur.id));
+              else store.callPeer(store.usersMap[Number(cur.id)] || { id: Number(cur.id), username: "?" });
+            }}
+          >
+            <Icon name={cur.kind === "room" ? "users" : "phone"} size={17} />
+          </button>
         </div>
       {:else}
         <div class="chat-title"><span class="title-text">nekochat</span></div>
@@ -253,8 +291,7 @@
     gap: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--outline-variant);
-  }
-  .me-name {
+  }  .me-name {
     flex: 1;
     font-size: 13px;
     font-weight: 600;
@@ -275,6 +312,7 @@
     flex: none;
     display: flex;
     align-items: center;
+    gap: 12px;
     padding: 10px 16px;
     background: var(--bar-bg);
     border-bottom: 1px solid var(--hairline);
@@ -283,6 +321,39 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+  }
+  .head-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+  }
+  .head-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .head-btn:hover {
+    background: var(--panel-hover);
+    color: var(--text1);
+  }
+  .head-btn.active {
+    background: var(--ok);
+    color: #000;
+  }
+  .online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--outline);
+    flex: none;
+  }
+  .online-dot.on {
+    background: var(--ok);
   }
   .chan-chip {
     width: 26px;
@@ -323,6 +394,9 @@
   .msg {
     max-width: 78%;
     display: flex;
+    /* чужие — слева, свои — справа. Явно, а не через дефолт align-items:
+       иначе смена выравнивания у .msgs тихо съела бы раскладку. */
+    align-self: flex-start;
   }
   .msg.mine {
     align-self: flex-end;

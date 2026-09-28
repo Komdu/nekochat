@@ -374,30 +374,30 @@ class MediaHub:
         out["quota_rejects"] = self.quota_rejects
         return out
 
+    async def writer_loop(self, conn: MediaConn) -> None:
+        """Разбирает очередь в приоритетном порядке и шлёт в сокет.
+
+        Между отправками уступаем циклу (await asyncio.sleep(0)), иначе плотный
+        файловый поток съедает event loop и ломает приём на том же сокете.
+
+        Метод хаба, а не свободная функция: нужно пополнять накопительный
+        total_tx, который живёт рядом с total_rx (тот считается на релее).
+        """
+        q = conn.q
+        while True:
+            item = q.pop()
+            if item is None:
+                await q.wait()
+                continue
+            try:
+                await conn.ws.send_bytes(item)
+            except Exception:
+                # сокет мёртв — дальше отправлять бессмысленно; разрыв догонит endpoint
+                return
+            conn.tx += 1
+            conn.tx_bytes += len(item)
+            self.total_tx += 1
+            await asyncio.sleep(0)
+
 
 hub = MediaHub()
-
-
-# ---------------------------------------------------------------- писатель
-
-
-async def writer_loop(conn: MediaConn) -> None:
-    """Разбирает очередь в приоритетном порядке и шлёт в сокет.
-
-    Между отправками уступаем циклу (await asyncio.sleep(0)), иначе плотный
-    файловый поток съедает event loop и ломает приём на том же сокете.
-    """
-    q = conn.q
-    while True:
-        item = q.pop()
-        if item is None:
-            await q.wait()
-            continue
-        try:
-            await conn.ws.send_bytes(item)
-        except Exception:
-            # сокет мёртв — дальше отправлять бессмысленно; разрыв догонит endpoint
-            return
-        conn.tx += 1
-        conn.tx_bytes += len(item)
-        await asyncio.sleep(0)

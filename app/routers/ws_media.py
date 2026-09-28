@@ -33,7 +33,6 @@ from ..ws_media import (
     parse_frame,
     unpack_flags,
     room_members,
-    writer_loop,
 )
 from ..ws_media import IncompleteFrame
 
@@ -103,7 +102,7 @@ async def _serve_channel(ws: WebSocket, channel: str) -> None:
         kind=channel,
         q=OutQueue(probe.caps()),
     )
-    conn.writer = asyncio.create_task(writer_loop(conn))
+    conn.writer = asyncio.create_task(hub.writer_loop(conn))
     hub.add(conn)
 
     allowed = MEDIA_ALLOWED_KINDS if channel == "media" else TRANSFER_ALLOWED_KINDS

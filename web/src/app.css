@@ -213,3 +213,35 @@ textarea {
   vertical-align: middle;
   flex: none;
 }
+
+/* ---------- тема win98 для оверлея звонка ----------
+ * Правила здесь, а не в компоненте: селекторы вида html[data-theme=...] не
+ * проходят через область видимости Svelte и были бы вырезаны как неиспользуемые.
+ */
+html[data-theme="win98"] .call-card {
+  background: #d4d0c8;
+  color: #000000;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 2px;
+  box-shadow: none;
+}
+html[data-theme="win98"] .call-info {
+  color: #000000;
+}
+html[data-theme="win98"] .call-btn {
+  border-radius: 0;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  background: #d4d0c8;
+  color: #000000;
+  padding: 6px 16px;
+}
+html[data-theme="win98"] .call-btn:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+html[data-theme="win98"] .call-accept,
+html[data-theme="win98"] .call-decline,
+html[data-theme="win98"] .call-mute {
+  background: #d4d0c8;
+}

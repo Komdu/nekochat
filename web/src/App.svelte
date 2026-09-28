@@ -4,6 +4,7 @@
   import { applyTheme, theme } from "./lib/theme";
   import Login from "./ui/Login.svelte";
   import Chat from "./ui/Chat.svelte";
+  import CallOverlay from "./ui/CallOverlay.svelte";
 
   // тему ставим и в рантайме (в index.html она уже выставлена до отрисовки,
   //  чтобы не мигало; здесь — чтобы localStorage совпадал с разметкой)
@@ -17,6 +18,8 @@
   <Login />
 {:else}
   <Chat />
+  <!-- оверлей звонка поверх всего: входящий, активный, демонстрации экрана -->
+  <CallOverlay />
 {/if}
 
 <style>

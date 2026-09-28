@@ -5,6 +5,8 @@
 // (heartbeat, ретраи, ре-анонс канала) сохранена один в один — она проверена.
 
 import { ApiClient } from "./net";
+import { CallEngine, type CallState } from "./calls";
+import { pluralized } from "./format";
 import type { Conversation, Current, Msg, Room, User, WsEvent } from "./types";
 
 const LS = {
@@ -46,12 +48,17 @@ class Store {
   busy = $state(false);
   error = $state("");
 
+  /** Состояние звонка для UI. null — звонка нет (или он закрыт). */
+  call = $state<CallState | null>(null);
+
   api = new ApiClient();
   base = this.api.base;
 
   private noteTimer: number | null = null;
   private seen: Record<string, Set<string | number>> = {};
   private watchTimer: number | null = null;
+  /** Движок звонков. Создаётся, когда известен наш id (после логина). */
+  calls: CallEngine | null = null;
 
   constructor() {
     this.wire();
@@ -62,11 +69,12 @@ class Store {
   get list(): Array<{ kind: "room" | "dm"; id: string; label: string; sub: string }> {
     const out: Array<{ kind: "room" | "dm"; id: string; label: string; sub: string }> = [];
     for (const r of this.rooms) {
+      const n = r.member_count ?? r.members?.length ?? 0;
       out.push({
         kind: "room",
         id: String(r.id),
         label: r.name,
-        sub: `${r.member_count ?? r.members?.length ?? 0} участников`,
+        sub: pluralized(n, "участник", "участника", "участников"),
       });
     }
     const meId = this.me?.id;
@@ -80,6 +88,12 @@ class Store {
   get messages(): Msg[] {
     const cur = this.current;
     return cur ? this.msgs[cur.key] || [] : [];
+  }
+
+  /** Сколько человек сейчас на связи. Считаем по событиям presence, а не по
+   *  размеру списка пользователей — тот включает и тех, кто давно не заходил. */
+  get onlineCount(): number {
+    return Math.max(1, this.online.size);
   }
 
   isOnline(u: { id: number } | null | undefined): boolean {
@@ -129,10 +143,39 @@ class Store {
     this.phase = "ready";
     this.api.wsOpen();
     this.api.wsMediaOpen("media");
+    this.ensureCalls(user.id);
     void this.loadData();
   }
 
+  // ---------------- звонки ----------------
+
+  /** Создать движок звонков. Один на сессию: при смене пользователя —
+   *  старый уничтожается (иначе остались бы открытые микрофон и AudioContext). */
+  private ensureCalls(meId: number): void {
+    this.calls?.destroy();
+    const engine = new CallEngine(meId, (m) => this.api.sendCallSignal(m));
+    engine.wsStateGetter = () => this.api.wsReady();
+    // аудио/видео — в бинарный сокет; sendMedia вернёт false, если он не готов
+    engine.mediaSink = (kind, flags, target, payload) => this.api.sendMedia(kind, flags, target, payload);
+    engine.onState = (s) => {
+      // «ended» показываем, чтобы пользователь увидел причину, дальше — тишина
+      this.call = s.phase === "idle" ? null : s;
+    };
+    this.calls = engine;
+  }
+
+  callPeer(u: User): void {
+    void this.calls?.start(u.id);
+  }
+
+  joinRoomCall(roomId: number): void {
+    void this.calls?.startRoomCall(roomId);
+  }
+
   logout(): void {
+    this.calls?.destroy();
+    this.calls = null;
+    this.call = null;
     this.api.wsMediaClose();
     this.api.wsClose();
     this.me = null;
@@ -163,6 +206,7 @@ class Store {
     this.phase = "ready";
     this.api.wsOpen();
     this.api.wsMediaOpen("media");
+    this.ensureCalls(saved.id);
     // сервер мог перезапуститься / туннель моргнул — пробуем несколько раз
     const attempt = async (n: number): Promise<void> => {
       try {
@@ -195,9 +239,12 @@ class Store {
       for (const c of this.convs) if (c.user?.id != null) map[c.user.id] = { ...map[c.user.id], ...c.user };
       this.usersMap = map;
       if (!this.current) {
+        // открываем последний чат, а если его нет — первую комнату: пустой
+        // правый экран после входа выглядит как «ничего не работает»
         const last = loadJson<{ kind: string; id: string } | null>(LS.last, null);
         const r = last?.kind === "room" ? this.rooms.find((x) => String(x.id) === last.id) : undefined;
-        if (r) void this.selectRoom(r);
+        const target = r ?? this.rooms[0];
+        if (target) void this.selectRoom(target);
       }
     } catch (e) {
       this.noteMsg(e instanceof Error ? e.message : String(e));
@@ -259,6 +306,12 @@ class Store {
     this.api.onAuthFailed = (m) => this.logout();
     this.api.onWs = (ev) => this.onEvent(ev);
     this.api.onWsReconnected = () => void this.loadData();
+    // бинарные кадры аудио/видео -> движок звонков
+    this.api.onWsMedia = (kind, flags, from, payload) => {
+      this.calls?.handleMedia(kind, flags, from, payload);
+    };
+    // голосовой канал переживает обрыв: сокет поднимется, движок переанонсирует
+    this.api.onWsMediaReconnected = () => this.calls?.onTransportBack();
     // возврат во вкладку: WebView/браузер мог заморозить таймеры
     const wake = () => {
       if (document.visibilityState === "visible") this.api.wsOpen();
@@ -274,6 +327,20 @@ class Store {
     if (ev.type === "ping") {
       this.api.send({ type: "pong" });
       return;
+    }
+    // сигналинг звонков и демонстрации экрана: всё остальное — движку
+    switch (ev.type) {
+      case "call":
+      case "call_offer":
+      case "call_answer":
+      case "call_ice":
+      case "call_hangup":
+      case "call_audio":
+      case "screen_start":
+      case "screen_frame":
+      case "screen_stop":
+        this.calls?.handleEvent(ev);
+        return;
     }
     if (ev.type === "status") {
       if (ev.user_id == null) return;

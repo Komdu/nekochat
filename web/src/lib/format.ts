@@ -40,8 +40,24 @@ export function avatarColors(): string[] {
   return AV_COLORS;
 }
 
-export function fmtTime(s: string | undefined | null): string {
-  try {
+/** Русское согласование: участник / участника / участников.
+ *  Ключи считаются по последним двум цифрам: 11-14 всегда идут во множественном
+ *  числе (11 участников, а не 11 участников). */
+export function plural(n: number, one: string, few: string, many: string): string {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+
+/** «3 участника», «1 участник» — число вместе со словом. */
+export function pluralized(n: number, one: string, few: string, many: string): string {
+  return `${n} ${plural(n, one, few, many)}`;
+}
+
+export function fmtTime(s: string | undefined | null): string {  try {
     const dt = new Date(s ? s.replace("Z", "+00:00") : "");
     if (isNaN(dt.getTime())) return "";
     const local = new Date(dt.getTime());

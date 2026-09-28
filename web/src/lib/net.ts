@@ -314,6 +314,12 @@ export class ApiClient {
     this.startWsPing();
   }
 
+  /** readyState сокета управления. Движок звонков спрашивает это при
+   *  диагностике зависшего main-thread: readyState === 1, а звука нет. */
+  wsReady(): number {
+    return this.ws ? this.ws.readyState : -1;
+  }
+
   /** Сторож тишины: нет входящих дольше WS_SILENT_MS — считаем сокет мёртвым. */
   wsWatch(): void {
     if (this.ws && Date.now() - this.wsLastRxAt > WS_SILENT_MS && navigator.onLine !== false) {
