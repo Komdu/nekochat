@@ -276,6 +276,57 @@ html[data-theme="win98"] input[type="checkbox"] { accent-color: #000080; }
 html[data-mode="light"]:not([data-theme="win98"]) { color-scheme: light; }
 
 /* ============================================================
+   OLED — основная тема: настоящий чёрный, нейтральный серый, без
+   цветового оттенка. На OLED-матрице пиксели #000 не горят, а
+   контраст выше, чем у «тёмно-фиолетового». Палитра задана прямо в
+   CSS (как win98): генератор M3 тут не нужен и именно он давал
+   оттенок фонов от акцента.
+   ============================================================ */
+html[data-theme="oled"] {
+  color-scheme: dark;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  --desk: #000000;
+  --panel: #0a0a0a;
+  --panel-hover: #1a1a1a;
+  --divider: #242424;
+  --text1: #f2f2f2;
+  --muted: #9a9a9a;
+  --title1: #ffffff;
+  --title2: #bdbdbd;
+  --link: #ffffff;
+  --mine: #1c1c1c;
+  --mine-sender: #f2f2f2;
+  --chat-sub: #9a9a9a;
+  --focus: #1a1a1a;
+  --primary: #ffffff;
+  --on-primary: #000000;
+  --primary-container: #1f1f1f;
+  --on-primary-container: #f2f2f2;
+  --secondary-container: #1a1a1a;
+  --on-secondary-container: #f2f2f2;
+  --surface: #0d0d0d;
+  --on-surface: #f2f2f2;
+  --on-surface-variant: #9a9a9a;
+  --outline: #5a5a5a;
+  --outline-variant: #242424;
+  --surface-lowest: #000000;
+  --surface-low: #0a0a0a;
+  --surface-high: #161616;
+  --surface-highest: #1f1f1f;
+  /* плоский чат: те же значения, что у темы по умолчанию */
+  --chat-bg: #000000;
+  --bar-bg: #070707;
+  --bubble-bg: #0d0d0d;
+  --bubble-border: #d8d8d8;
+  --bubble-text: #f2f2f2;
+  --bubble-mine-bg: #191919;
+  --bubble-mine-border: #f5f5f5;
+  --hairline: #1a1a1a;
+  --chip-active-bg: #212121;
+  --chip-text: #dcdcdc;
+}
+
+/* ============================================================
    Звонки (WebRTC P2P): оверлей поверх всего ready-интерфейса
    ============================================================ */
 .call-overlay {

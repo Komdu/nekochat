@@ -17,6 +17,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   };
 
   const fileMode = t.theme === "file";
+  const oled = t.theme === "oled";
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -26,6 +27,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         <div className="fgroup">
           <div className="fgroup-label">Тема</div>
           <div className="row">
+            <label className="radio"><input type="radio" checked={t.theme === "oled"} onChange={() => apply({ theme: "oled" })} /> OLED</label>
             <label className="radio"><input type="radio" checked={t.theme === "material"} onChange={() => apply({ theme: "material" })} /> Material You</label>
             <label className="radio"><input type="radio" checked={t.theme === "win98"} onChange={() => apply({ theme: "win98" })} /> Win98</label>
             {fileTheme && (
@@ -56,11 +58,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             <label className={"radio" + (t.theme !== "material" ? " disabled" : "")}>
               <input type="radio" disabled={t.theme !== "material"} checked={t.theme === "material" && t.mode === "dark"} onChange={() => apply({ mode: "dark" })} /> Тёмная
             </label>
+            {t.theme === "oled" && <div className="login-note">Тема OLED всегда тёмная</div>}
           </div>
         </div>
 
         <div className="fgroup">
-          <div className="fgroup-label">Акцент</div>
+          <div className="fgroup-label">Акцент{oled ? " — не применяется" : ""}</div>
           <div className="swatches">
             {Object.entries(PRESETS).map(([name, hex]) => (
               <button
@@ -68,7 +71,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 className={"swatch" + (t.accent === name ? " active" : "")}
                 style={{ background: hex }}
                 title={name}
-                disabled={fileMode}
+                disabled={fileMode || oled}
                 onClick={() => apply({ accent: name })}
               />
             ))}
@@ -78,7 +81,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             >
               <input
                 type="color"
-                disabled={fileMode}
+                disabled={fileMode || oled}
                 value={/^#?[0-9a-f]{6}$/i.test(t.accent) ? t.accent : "#6750a4"}
                 onChange={(e) => apply({ accent: e.target.value })}
               />

@@ -150,7 +150,9 @@ export function applyTheme(theme: string, mode: string, accent: string): void {
   }
   root.dataset.theme = theme;
   root.dataset.mode = mode;
-  if (theme !== "win98") {
+  // oled и win98 — палитра задана в CSS. Подливать сверху токены M3 нельзя:
+  // они принесли бы цветовой оттенок обратно.
+  if (theme !== "win98" && theme !== "oled") {
     const t = m3Tokens(accent, mode === "dark");
     for (const [key, value] of Object.entries(t)) {
       const css = TOKEN_TO_VAR[key];
@@ -215,7 +217,10 @@ export async function readFileTheme(): Promise<FileTheme | null> {
 export type ThemeSettings = { theme: string; mode: string; accent: string };
 
 export function defaultSettings(): ThemeSettings {
-  return { theme: "material", mode: "dark", accent: "indigo" };
+  // OLED по умолчанию: настоящий чёрный и нейтральный серый. Material You и
+  // Win98 остаются в настройках — тема задаётся в localStorage, у кого
+  // выбрана другая, та и останется.
+  return { theme: "oled", mode: "dark", accent: "indigo" };
 }
 
 export { PRESETS };

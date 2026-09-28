@@ -39,6 +39,25 @@
       --mine: #2b3a55;      --mine-sender: #9cc3ff;
       --chat-sub: #a8c4e8;  --ok: #5fbf5f;
     }
+    /* OLED — основная тема: настоящий чёрный и нейтральный серый.
+       На OLED-матрице пиксели #000 не горят, а контраст выше без
+       цветового оттенка. У Material You сами фоны становятся сиреевыми. */
+    html[data-theme="oled"] {
+      --face: #000000;      --light: #141414;  --face2: #0a0a0a;
+      --shadow: #242424;    --dark: #000000;   --win-text: #f2f2f2;
+      --title1: #ffffff;    --title2: #bdbdbd; --desk: #000000;
+      --on-title: #000000;  --panel: #0a0a0a;  --panel-hover: #1a1a1a;
+      --text1: #f2f2f2;     --muted: #9a9a9a;  --divider: #242424;
+      --focus: #1a1a1a;     --link: #ffffff;   --err: #e05a5a;
+      --mine: #1c1c1c;      --mine-sender: #f2f2f2;
+      --chat-sub: #9a9a9a;  --ok: #35d07f;
+      /* плоский чат (см. макет-блок) */
+      --taskbar-h: 0px;
+      --chat-bg: #000000;  --bar-bg: #070707;
+      --bubble-bg: #0d0d0d; --bubble-border: #d8d8d8; --bubble-text: #f2f2f2;
+      --bubble-mine-bg: #191919; --bubble-mine-border: #f5f5f5;
+      --hairline: #1a1a1a;  --chip-active-bg: #212121; --chip-text: #dcdcdc;
+    }
     html[data-theme="material"][data-mode="dark"] {  /* Material (M3), тёмная */
       --face: #1d1b20;      --light: #211f26;  --face2: #141218;
       --shadow: #49454f;    --dark: #08070a;   --win-text: #e6e0e9;
@@ -463,9 +482,10 @@
     (function () {
       // применить тему до первой отрисовки (без мерцания)
       try {
-        var v = localStorage.getItem('nk_theme') || 'win98-light';
+        var v = localStorage.getItem('nk_theme') || 'oled';
         if (/^standard-/.test(v)) v = v.replace('standard-', 'material-');
-        if (!/^(win98|material)-(light|dark)$/.test(v)) v = 'win98-light';
+        if (v === 'material') v = 'material-dark';
+        if (!/^(win98|material|oled)-(light|dark)$/.test(v)) v = 'oled';
         var p = v.split('-');
         document.documentElement.dataset.theme = p[0];
         document.documentElement.dataset.mode = p[1];
@@ -826,6 +846,8 @@
       <div class="modal-body">
         <div class="th-group">
           <div class="th-label" data-t="th_style">Стиль</div>
+          <label class="th-opt"><input type="radio" name="th-style" value="oled" /> OLED</label>
+          <label class="th-opt"><input type="radio" name="th-style" value="oled" /> OLED</label>
           <label class="th-opt"><input type="radio" name="th-style" value="win98" /> Win98</label>
           <label class="th-opt"><input type="radio" name="th-style" value="material" /> Material</label>
         </div>
@@ -965,14 +987,16 @@
       KEY: 'nk_theme',
       get() {
         var v;
-        try { v = localStorage.getItem(this.KEY) || 'win98-light'; } catch (e) { return 'win98-light'; }
+        try { v = localStorage.getItem(this.KEY) || 'oled'; } catch (e) { return 'oled'; }
         if (/^standard-/.test(v)) { v = v.replace('standard-', 'material-'); this.set(v); }
+        if (!/^(win98|material|oled)-(light|dark)$/.test(v)) return 'oled';
         return v;
       },
       set(v) { try { localStorage.setItem(this.KEY, v); } catch (e) {} },
       apply(v) {
         if (/^standard-/.test(v)) v = v.replace('standard-', 'material-');
-        if (!/^(win98|material)-(light|dark)$/.test(v)) v = 'win98-light';
+        if (v === 'material') v = 'material-dark';
+        if (!/^(win98|material|oled)-(light|dark)$/.test(v)) v = 'oled';
         const p = v.split('-');
         document.documentElement.dataset.theme = p[0];
         document.documentElement.dataset.mode = p[1];
@@ -982,7 +1006,7 @@
     function syncThemeForm() {
       const p = Theme.get().split('-');
       const q = (n, val) => document.querySelector(`input[name="${n}"][value="${val}"]`);
-      const el = q('th-style', p[0]) || q('th-style', 'win98');
+      const el = q('th-style', p[0]) || q('th-style', 'oled');
       const em = q('th-mode', p[1]) || q('th-mode', 'light');
       el.checked = true;
       em.checked = true;
