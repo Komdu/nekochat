@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
-// Билд кладётся прямо в app/static/web_next — сервер будет отдавать его
-// как /web (см. app/main.py: _static_dir()). Vite-обёртка не нужна: пути
-// внутри собранного приложения абсолютные, как и ожидает текущий клиент.
+// Билд кладётся в app/static/web_next — сервер отдаёт его как /web_next (а
+// сейчас /web). ВАЖНО: base обязан совпадать с префиксом раздачи, иначе ссылки
+// на бандл уедут в корень сайта и страница останется пустой — при этом сборка
+// проходит успешно. Когда новый клиент займёт /web, поменяй NKO_WEB_BASE.
+const BASE = process.env.NKO_WEB_BASE ?? "/web_next/";
+
 export default defineConfig({
   plugins: [svelte()],
-  base: "/",
+  base: BASE,
   build: {
     outDir: "../app/static/web_next",
     emptyOutDir: true,

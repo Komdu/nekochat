@@ -1,0 +1,387 @@
+<script lang="ts">
+  // Чат: список чатов слева, сообщения справа. Плоская тёмная тема.
+  import { store } from "../lib/store.svelte";
+  import { fmtTime } from "../lib/format";
+
+  let draft = $state("");
+
+  const msgs = $derived(store.messages);
+  const cur = $derived(store.current);
+
+  function send(e: Event) {
+    e.preventDefault();
+    const t = draft.trim();
+    if (!t) return;
+    store.send(t);
+    draft = "";
+  }
+
+  function onKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send(e);
+    }
+  }
+
+  function who(m: { sender_id?: number; user_id?: number; sender?: { display_name?: string | null; username?: string }; user?: { display_name?: string | null; username?: string } }): string {
+    const uid = m.sender_id ?? m.user_id;
+    if (uid === store.me?.id) return store.me?.display_name || store.me?.username || "Я";
+    const u = (m.sender || m.user) as { display_name?: string | null; username?: string } | undefined;
+    return u?.display_name || u?.username || (uid != null ? "@" + uid : "?");
+  }
+
+  function isMine(m: { sender_id?: number; user_id?: number }): boolean {
+    return (m.sender_id ?? m.user_id) === store.me?.id;
+  }
+</script>
+
+<div class="app">
+  <aside class="side">
+    <div class="side-head">
+      <span class="side-logo">#</span>
+      <div class="side-server">
+        <div class="server-name">nekochat</div>
+        <div class="server-sub">{store.users.length + 1} онлайн</div>
+      </div>
+      <button class="icon-btn" title="Обновить" onclick={() => window.location.reload()}>⟳</button>
+    </div>
+    <div class="list">
+      {#each store.list as item (item.kind + item.id)}
+        <button
+          class="list-item"
+          class:active={cur?.kind === item.kind && cur?.id === item.id}
+          onclick={() => (item.kind === "room"
+            ? store.selectRoom({ id: Number(item.id), name: item.label })
+            : store.selectUser({ id: Number(item.id), username: item.label, display_name: item.label }))}
+        >
+          <span class="item-mark">{item.kind === "room" ? "#" : "@"}</span>
+          <span class="item-info">
+            <span class="item-name">{item.label}</span>
+            <span class="item-sub">{item.sub}</span>
+          </span>
+        </button>
+      {/each}
+      {#if store.list.length === 0}
+        <div class="empty">Пока пусто — создайте комнату</div>
+      {/if}
+    </div>
+    <div class="side-foot">
+      <span class="me-name">{store.me?.display_name || store.me?.username}</span>
+      <button class="icon-btn" title="Выйти" onclick={() => store.logout()}>⏻</button>
+    </div>
+  </aside>
+
+  <main class="chat">
+    <header class="chat-head">
+      {#if cur}
+        <div class="chat-title">
+          <span class="chan-chip">{cur.kind === "room" ? "#" : "@"}</span>
+          <span class="title-text">{cur.label.replace(/^[@#]\s*/, "")}</span>
+        </div>
+      {:else}
+        <div class="chat-title"><span class="title-text">nekochat</span></div>
+      {/if}
+    </header>
+
+    {#if store.note}<div class="note-bar">{store.note}</div>{/if}
+
+    <div class="msgs">
+      {#if !cur}
+        <div class="placeholder">Выбери комнату или собеседника слева</div>
+      {:else if msgs.length === 0}
+        <div class="placeholder">Пока пусто. Напиши первым!</div>
+      {:else}
+        {#each msgs as m (String(m.id ?? Math.random()))}
+          <div class="msg" class:mine={isMine(m)}>
+            <div class="msg-body">
+              <div class="msg-head">
+                <span class="msg-name">{who(m)}</span>
+                <span class="msg-time">{fmtTime(m.created_at)}</span>
+              </div>
+              <div class="msg-text">{m.content}</div>
+            </div>
+          </div>
+        {/each}
+      {/if}
+    </div>
+
+    <div class="composer">
+      <textarea
+        class="composer-input"
+        rows="1"
+        bind:value={draft}
+        onkeydown={onKeydown}
+        placeholder={cur ? "Сообщение…" : "Сначала выбери чат"}
+        disabled={!cur}
+      ></textarea>
+    </div>
+  </main>
+</div>
+
+<style>
+  .app {
+    display: flex;
+    height: 100%;
+  }
+
+  /* ---------- список чатов ---------- */
+  .side {
+    width: 260px;
+    flex: none;
+    background: var(--panel);
+    border-right: 1px solid var(--outline-variant);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 10px;
+    gap: 8px;
+  }
+  .side-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 6px 8px;
+  }
+  .side-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--primary);
+    color: var(--on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    flex: none;
+  }
+  .side-server {
+    min-width: 0;
+    flex: 1;
+  }
+  .server-name {
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .server-sub {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn:hover {
+    background: var(--panel-hover);
+    color: var(--text1);
+  }
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .list-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    text-align: left;
+    padding: 7px 9px;
+    border-radius: 12px;
+    color: var(--text1);
+  }
+  .list-item:hover {
+    background: var(--panel-hover);
+  }
+  .list-item.active {
+    background: var(--primary-container);
+    color: var(--on-primary-container);
+  }
+  .item-mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    background: var(--surface-highest);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .list-item.active .item-mark {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .item-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .item-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .item-sub {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .list-item.active .item-sub {
+    color: var(--on-primary-container);
+    opacity: 0.75;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 8px;
+  }
+  .side-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--outline-variant);
+  }
+  .me-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- чат ---------- */
+  .chat {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--chat-bg);
+  }
+  .chat-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    background: var(--bar-bg);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .chat-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chan-chip {
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid var(--bubble-border);
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--bubble-text);
+  }
+  .title-text {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .note-bar {
+    margin: 8px 16px 0;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    background: color-mix(in srgb, var(--ok) 14%, transparent);
+    color: var(--ok);
+  }
+  .msgs {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .placeholder {
+    margin: 40px auto;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .msg {
+    max-width: 78%;
+    display: flex;
+  }
+  .msg.mine {
+    align-self: flex-end;
+  }
+  .msg-body {
+    background: var(--bubble-bg);
+    border: 1.5px solid var(--bubble-border);
+    border-radius: 16px;
+    padding: 7px 13px 8px;
+    color: var(--bubble-text);
+    min-width: 0;
+  }
+  .msg.mine .msg-body {
+    background: var(--bubble-mine-bg);
+    border-color: var(--bubble-mine-border);
+  }
+  .msg-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+  .msg-name {
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+  .msg-time {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .msg-text {
+    font-size: 14.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .composer {
+    flex: none;
+    padding: 4px 20px 12px;
+  }
+  .composer-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    color: var(--bubble-text);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 8px 2px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .composer-input::placeholder {
+    color: #6f6f6f;
+  }
+  .composer-input:disabled {
+    opacity: 0.5;
+  }
+</style>

@@ -1,7 +1,7 @@
-// Точка входа. Пока — проверочный каркас: убеждаемся, что тулчейн
-// Svelte + Vite собирается, и только потом наполняем его частями.
+// Точка входа: монтируем Svelte-приложение и подключаем общие стили.
 
 import { mount } from "svelte";
+import "./app.css";
 import App from "./App.svelte";
 
 const root = document.getElementById("app");

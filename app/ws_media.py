@@ -266,7 +266,12 @@ class MediaHub:
         # квоты на файлы: user_id -> {(stream_id, target)}
         self.file_streams: dict[int, set[tuple[int, int]]] = {}
         self.quota_rejects = 0
-
+        # Накопительные счётчики: НЕ обнуляются, когда все отключились.
+        # По-соседним (живым) соединениям видно только «прямо сейчас», а нам
+        # нужно «сколько прошло за час» — особенно для отброшенных кадров.
+        self.total_rx = 0
+        self.total_tx = 0
+        self.total_dropped = 0
     def admit_file(self, user_id: int, stream: int, target: int) -> bool:
         """Пустить ли новый файловый поток. Файлы — единственное, что можно
         вежливо не пустить: они одноразовые, получатель просто попросит ещё раз."""
@@ -295,6 +300,7 @@ class MediaHub:
         self.conns[conn.kind].setdefault(conn.user_id, set()).add(conn)
 
     def remove(self, conn: MediaConn) -> None:
+        self.total_dropped += sum(conn.q.dropped.values())
         bucket = self.conns[conn.kind].get(conn.user_id)
         if bucket is not None:
             bucket.discard(conn)
@@ -307,6 +313,7 @@ class MediaHub:
     # ---- релей ----
 
     def relay_to_user(self, user_id: int, kind: int, flags: int, src: int, payload: bytes) -> int:
+        self.total_rx += 1
         frame = build_frame(kind, flags, src, payload)
         prio = PRIO_BY_KIND[kind]
         conns = self.targets(CHANNEL_BY_KIND[kind], user_id)
@@ -315,6 +322,7 @@ class MediaHub:
         return len(conns)
 
     def relay_to_room(self, room_id: int, members: set[int], src: int, kind: int, flags: int, payload: bytes) -> int:
+        self.total_rx += 1
         frame = build_frame(kind, flags | FLAG_ROOM, src, payload)
         prio = PRIO_BY_KIND[kind]
         channel = CHANNEL_BY_KIND[kind]
@@ -359,6 +367,9 @@ class MediaHub:
                 "tx": total_tx,
                 "dropped": dropped,
             }
+        out["total_rx"] = self.total_rx
+        out["total_tx"] = self.total_tx
+        out["total_dropped"] = self.total_dropped
         out["file_streams"] = sum(len(v) for v in self.file_streams.values())
         out["quota_rejects"] = self.quota_rejects
         return out

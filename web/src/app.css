@@ -1,0 +1,215 @@
+/* Стили Svelte-клиента.
+ *
+ * Значения переменных — те же, что в desktop/src/styles.css и в текущем
+ * app/static/web/index.html: один визуальный язык для всех клиентов.
+ * Тема выбирается через data-theme на <html>.
+ */
+
+:root,
+html[data-theme="oled"] {
+  color-scheme: dark;
+  --desk: #000000;
+  --panel: #0a0a0a;
+  --panel-hover: #1a1a1a;
+  --divider: #242424;
+  --text1: #f2f2f2;
+  --muted: #9a9a9a;
+  --title1: #ffffff;
+  --link: #ffffff;
+  --mine: #1c1c1c;
+  --primary: #ffffff;
+  --on-primary: #000000;
+  --primary-container: #1f1f1f;
+  --on-primary-container: #f2f2f2;
+  --surface: #0d0d0d;
+  --outline: #5a5a5a;
+  --outline-variant: #242424;
+  --surface-high: #161616;
+  --surface-highest: #1f1f1f;
+  --secondary-container: #1a1a1a;
+  --on-secondary-container: #f2f2f2;
+  --chat-bg: #000000;
+  --bar-bg: #070707;
+  --bubble-bg: #0d0d0d;
+  --bubble-border: #d8d8d8;
+  --bubble-text: #f2f2f2;
+  --bubble-mine-bg: #191919;
+  --bubble-mine-border: #f5f5f5;
+  --hairline: #1a1a1a;
+  --chip-active-bg: #212121;
+  --chip-text: #dcdcdc;
+  --danger: #e05a5a;
+  --ok: #35d07f;
+}
+
+html[data-theme="material"][data-mode="light"] {
+  color-scheme: light;
+  --desk: #e7e0ee;
+  --panel: #fffbfe;
+  --panel-hover: #f0eaf8;
+  --divider: #e4e0e7;
+  --text1: #1c1b1f;
+  --muted: #625d66;
+  --title1: #6750a4;
+  --link: #6750a4;
+  --mine: #e8dff8;
+  --primary: #6750a4;
+  --on-primary: #ffffff;
+  --primary-container: #eaddff;
+  --on-primary-container: #21005d;
+  --surface: #f6f2fa;
+  --outline: #79747e;
+  --outline-variant: #cac4d0;
+  --surface-high: #ece6f0;
+  --surface-highest: #e6e0e9;
+  --secondary-container: #e8def8;
+  --on-secondary-container: #1d192b;
+  --chat-bg: #f6f2fa;
+  --bar-bg: #ece6f0;
+  --bubble-bg: #ffffff;
+  --bubble-border: #cfcfcf;
+  --bubble-text: #1c1b1f;
+  --bubble-mine-bg: #e8dff8;
+  --bubble-mine-border: #9a86c8;
+  --hairline: #e4e0e7;
+  --chip-active-bg: #e8dff8;
+  --chip-text: #1c1b1f;
+  --danger: #b3261e;
+  --ok: #2e7d32;
+}
+
+html[data-theme="win98"] {
+  color-scheme: light;
+  --desk: #008080;
+  --panel: #fff;
+  --panel-hover: #ececf8;
+  --divider: #d0d0d0;
+  --text1: #000;
+  --muted: #555;
+  --title1: #000080;
+  --link: #0000ee;
+  --mine: #cfdcf0;
+  --primary: #000080;
+  --on-primary: #fff;
+  --primary-container: #000080;
+  --on-primary-container: #fff;
+  --surface: #fff;
+  --outline: #808080;
+  --outline-variant: #d0d0d0;
+  --surface-high: #ececf8;
+  --surface-highest: #d0d0d0;
+  --secondary-container: #d4d0c8;
+  --on-secondary-container: #000;
+  --chat-bg: #c0c0c0;
+  --bar-bg: #c0c0c0;
+  --bubble-bg: #ffffc1;
+  --bubble-border: #808080;
+  --bubble-text: #000;
+  --bubble-mine-bg: #d4d0c8;
+  --bubble-mine-border: #404040;
+  --hairline: #808080;
+  --chip-active-bg: #000080;
+  --chip-text: #000;
+  --danger: #a00000;
+  --ok: #006000;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: var(--desk);
+  color: var(--text1);
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: inherit;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: 8px;
+}
+
+/* ---------- общие элементы ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text1);
+  border: 1px solid var(--outline-variant);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.field input {
+  background: var(--surface);
+  color: var(--text1);
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+}
+.field input:focus {
+  border-color: var(--primary);
+}
+
+/* ---------- значки ---------- */
+.ico {
+  display: inline-block;
+  vertical-align: middle;
+  flex: none;
+}

@@ -234,4 +234,8 @@ async def ws_stats() -> dict:
         "transfer": s["transfer"],
         "file_streams": s["file_streams"],
         "quota_rejects": s["quota_rejects"],
+        # накопительные за всё время работы процесса: не обнуляются при отключениях
+        "total_rx": s["total_rx"],
+        "total_tx": s["total_tx"],
+        "total_dropped": s["total_dropped"],
     }
