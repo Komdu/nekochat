@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="oled" data-mode="dark" data-lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>nekochat</title>
+    <meta name="description" content="Nekochat: комнаты, личные сообщения, голосовые звонки и демонстрация экрана." />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="nekochat" />
+    <link rel="apple-touch-icon" href="/icon-app-1024.png" />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <title>nekochat</title>
+    <script>
+      // Тему применяем до первой отрисовки — иначе мигнёт светлым.
+      (function () {
+        try {
+          var v = localStorage.getItem("nk_theme") || "oled";
+          if (/^standard-/.test(v)) v = v.replace("standard-", "material-");
+          if (v === "material") v = "material-dark";
+          if (!/^(win98|material|oled)-(light|dark)$/.test(v)) v = "oled";
+          var p = v.split("-");
+          document.documentElement.dataset.theme = p[0];
+          document.documentElement.dataset.mode = p[1];
+        } catch (e) {
+          document.documentElement.dataset.theme = "oled";
+          document.documentElement.dataset.mode = "dark";
+        }
+        try {
+          var l = localStorage.getItem("nk_lang");
+          document.documentElement.dataset.lang = l === "ru" || l === "en" ? l : "ru";
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
