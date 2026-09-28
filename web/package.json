@@ -1,0 +1,20 @@
+{
+  "name": "nekochat-web",
+  "private": true,
+  "version": "0.11.0",
+  "type": "module",
+  "description": "Nekochat web client (Svelte 5) — единый клиент вместо десктопа и веба",
+  "scripts": {
+    "dev": "vite",
+    "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.6",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.3"
+  }
+}
