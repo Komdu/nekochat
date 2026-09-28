@@ -226,8 +226,19 @@ class Store {
     await attempt(1);
   }
 
-  private async loadData(): Promise<void> {
-    try {
+  /** Перечитать списки с сервера (после создания комнаты, выхода из неё). */
+  async reload(): Promise<void> {
+    await this.loadData();
+  }
+
+  updateProfile(p: { bio?: string; status?: string; profile_color?: string }): Promise<void> {
+    return this.api.updateProfile(p).then(() => this.api.me()).then((me) => {
+      this.me = me;
+      saveJson(LS.user, me);
+    });
+  }
+
+  async loadData(): Promise<void> {    try {
       const [rs, us, cs] = await Promise.all([this.api.rooms(), this.api.users(), this.api.conversations()]);
       const meId = this.api.meId;
       this.rooms = Array.isArray(rs) ? rs : [];

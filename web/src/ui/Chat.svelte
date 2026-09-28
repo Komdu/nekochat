@@ -4,8 +4,13 @@
   import { fmtTime } from "../lib/format";
   import Avatar from "./Avatar.svelte";
   import Icon from "./Icon.svelte";
+  import Dialog from "./Dialog.svelte";
+  import Settings from "./Settings.svelte";
+  import CreateRoom from "./CreateRoom.svelte";
 
   let draft = $state("");
+  let showSettings = $state(false);
+  let showCreate = $state(false);
 
   const msgs = $derived(store.messages);
   const cur = $derived(store.current);
@@ -60,6 +65,9 @@
         <div class="server-name">nekochat</div>
         <div class="server-sub">{store.onlineCount} онлайн</div>
       </div>
+      <button class="icon-btn" title="Создать комнату" onclick={() => (showCreate = true)}>
+        <Icon name="plus" size={16} />
+      </button>
       <button class="icon-btn" title="Обновить" onclick={() => window.location.reload()}>
         <Icon name="refresh" size={16} />
       </button>
@@ -86,7 +94,12 @@
     </div>
     <div class="side-foot">
       <Avatar user={store.me} size={28} base={store.base} />
-      <span class="me-name">{store.me?.display_name || store.me?.username}</span>
+      <button class="me-name" title="Настройки" onclick={() => (showSettings = true)}>
+        {store.me?.display_name || store.me?.username}
+      </button>
+      <button class="icon-btn" title="Настройки" onclick={() => (showSettings = true)}>
+        <Icon name="settings" size={16} />
+      </button>
       <button class="icon-btn" title="Выйти" onclick={() => store.logout()}>
         <Icon name="power" size={16} />
       </button>
@@ -155,6 +168,9 @@
     </div>
   </main>
 </div>
+
+<Settings bind:open={showSettings} />
+<CreateRoom bind:open={showCreate} />
 
 <style>
   .app {
@@ -298,6 +314,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
+    padding: 4px 6px;
+    border-radius: 8px;
+    min-width: 0;
+  }
+  .me-name:hover {
+    background: var(--panel-hover);
   }
 
   /* ---------- чат ---------- */

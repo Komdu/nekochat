@@ -245,3 +245,157 @@ html[data-theme="win98"] .call-decline,
 html[data-theme="win98"] .call-mute {
   background: #d4d0c8;
 }
+
+/* ---------- тема win98: диалоги, кнопки, поля ввода ----------
+ * Стили компонентов лежат в их области видимости и не могут обратиться к
+ * html[data-theme], поэтому переопределения темы живут здесь.
+ * Без них win98 выглядела как «светлый OLED»: скруглённые окна вместо
+ * объёмных рамок.
+ */
+html[data-theme="win98"] .dlg-card {
+  background: #d4d0c8;
+  color: #000;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 14px 16px;
+}
+html[data-theme="win98"] .dlg-backdrop {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: none;
+}
+html[data-theme="win98"] .dlg-title {
+  font-size: 15px;
+}
+html[data-theme="win98"] .dlg-x {
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  background: #d4d0c8;
+  color: #000;
+  border-radius: 0;
+}
+html[data-theme="win98"] .dlg-x:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+html[data-theme="win98"] .btn {
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 0;
+  background: #d4d0c8;
+  color: #000;
+  padding: 6px 16px;
+  font-weight: 600;
+}
+html[data-theme="win98"] .btn:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+html[data-theme="win98"] .btn:not(:disabled):active {
+  padding: 7px 15px 5px 17px;
+}
+html[data-theme="win98"] .field > span {
+  color: #000;
+  font-size: 11px;
+}
+html[data-theme="win98"] .field input,
+html[data-theme="win98"] .field textarea {
+  background: #fff;
+  color: #000;
+  border: 2px solid;
+  border-color: #404040 #ffffff #ffffff #404040;
+  border-radius: 0;
+}
+html[data-theme="win98"] .field input:focus {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+html[data-theme="win98"] .theme,
+html[data-theme="win98"] .mode,
+html[data-theme="win98"] .swatch {
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 0;
+  background: #d4d0c8;
+}
+html[data-theme="win98"] .theme.on,
+html[data-theme="win98"] .mode.on {
+  background: #000080;
+  color: #fff;
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+html[data-theme="win98"] .theme-hint,
+html[data-theme="win98"] .sec-title,
+html[data-theme="win98"] .note {
+  color: #000;
+}
+html[data-theme="win98"] .theme.on .theme-hint {
+  color: #fff;
+  opacity: 0.85;
+}
+html[data-theme="win98"] .theme.on .theme-name {
+  color: #fff;
+}
+
+/* Списки, пузыри и прочее — тоже объёмное, иначе тема выглядит лишь наполовину. */
+html[data-theme="win98"] .list-item,
+html[data-theme="win98"] .item-mark,
+html[data-theme="win98"] .avatar {
+  border-radius: 0;
+}
+html[data-theme="win98"] .list-item {
+  border: 1px solid transparent;
+}
+html[data-theme="win98"] .list-item:hover {
+  border-color: #ffffff #808080 #808080 #ffffff;
+}
+html[data-theme="win98"] .list-item.active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+html[data-theme="win98"] .item-mark {
+  border: 1px solid #808080;
+  background: #d4d0c8;
+  color: #000;
+}
+html[data-theme="win98"] .list-item.active .item-mark {
+  background: #000080;
+  color: #fff;
+}
+html[data-theme="win98"] .msg-body {
+  border-radius: 0;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+}
+html[data-theme="win98"] .msg.mine .msg-body {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+html[data-theme="win98"] .chan-chip,
+html[data-theme="win98"] .side-logo {
+  border-radius: 0;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+}
+html[data-theme="win98"] .icon-btn,
+html[data-theme="win98"] .head-btn,
+html[data-theme="win98"] .online-dot {
+  border-radius: 0;
+}
+html[data-theme="win98"] .chat-head,
+html[data-theme="win98"] .side {
+  border-color: #808080;
+}
+html[data-theme="win98"] .side-foot {
+  border-top: 1px solid #808080;
+}
+html[data-theme="win98"] .composer-input::placeholder {
+  color: #808080;
+}
+html[data-theme="win98"] .head-btn.active {
+  background: #006000;
+  color: #fff;
+}
+html[data-theme="win98"] .note-bar {
+  border: 1px solid #006000;
+  background: #c0efc0;
+  color: #000;
+  border-radius: 0;
+}

@@ -23,8 +23,9 @@
     (user?.display_name || user?.username || "?").trim().slice(0, 2).toUpperCase(),
   );
   const bg = $derived(userColor(user));
-  const color = $derived(bg);
-  const dim = $derived(color.replace("#", "") + "00");
+  // Прозрачный конец градиента. Решётку (#) нельзя терять: без неё весь
+  // background становится невалидным и аватарка рисуется вовсе без фона.
+  const dim = $derived(bg + "00");
 </script>
 
 <div
@@ -35,7 +36,7 @@
   {#if src}
     <img {src} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />
   {:else}
-    <span style={`font-size:${Math.round(size * 0.4)}px`}>{initials}</span>
+    <span class="ini" style={`font-size:${Math.round(size * 0.4)}px`}>{initials}</span>
   {/if}
 </div>
 
@@ -55,5 +56,12 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  /* Инициалы рисуем с собственной тенью: в win98 под ними светлая плашка, и
+     белый текст без тени был бы нечитаем. */
+  .ini {
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    line-height: 1;
   }
 </style>

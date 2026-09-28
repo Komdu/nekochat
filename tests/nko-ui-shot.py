@@ -216,8 +216,102 @@ async def main():
               bool(colors) and "end" in (colors["mineSide"] or "") and "start" in (colors["otherSide"] or ""),
               json.dumps(colors or {}))
 
+        # ---- диалоги: настройки и создание комнаты ----
+        print("\n[5] диалоги")
+        # открыть настройки кликом по кнопке в подвале
+        await cdp.eval("""
+          (() => {
+            const btns = Array.from(document.querySelectorAll('.side-foot button'));
+            const b = btns.find(x => x.title === 'Настройки');
+            if (b) { b.click(); return true; }
+            return false;
+          })()
+        """)
+        await asyncio.sleep(0.8)
+        dlg = await cdp.eval("!!document.querySelector('.dlg-card')")
+        check("настройки открылись", bool(dlg))
+        themes = await cdp.eval("document.querySelectorAll('.theme').length")
+        check("доступны три темы (oled/material/win98)", themes == 3, f"themes={themes}")
+
+        # переключаем тему на win98 -> ждём смены data-theme
+        await cdp.eval("""
+          (() => {
+            const t = Array.from(document.querySelectorAll('.theme'))
+              .find(x => x.textContent.includes('Win98'));
+            if (t) t.click();
+            return true;
+          })()
+        """)
+        await asyncio.sleep(0.8)
+        th2 = await cdp.eval("document.documentElement.dataset.theme")
+        check("тема переключилась на win98", th2 == "win98", f"theme={th2}")
+        ls_theme = await cdp.eval("localStorage.getItem('nk_theme')")
+        check("выбор темы сохранён в localStorage", ls_theme == "win98-dark", f"ls={ls_theme}")
+
+        # возвращаем OLED (основная тема) и закрываем по Esc
+        await cdp.eval("""
+          (() => {
+            const t = Array.from(document.querySelectorAll('.theme'))
+              .find(x => x.textContent.includes('OLED'));
+            if (t) t.click();
+            return true;
+          })()
+        """)
+        await asyncio.sleep(0.5)
+        th3 = await cdp.eval("document.documentElement.dataset.theme")
+        check("вернулись на OLED", th3 == "oled", f"theme={th3}")
+
+        await cdp.send("Input.dispatchKeyEvent", type="keyDown", key="Escape", code="Escape", windowsVirtualKeyCode=27)
+        await cdp.send("Input.dispatchKeyEvent", type="keyUp", key="Escape", code="Escape", windowsVirtualKeyCode=27)
+        await asyncio.sleep(0.6)
+        closed = await cdp.eval("!document.querySelector('.dlg-card')")
+        check("диалог закрылся по Esc", bool(closed))
+
+        # создание комнаты
+        await cdp.eval("""
+          (() => {
+            const b = Array.from(document.querySelectorAll('.side-head button'))
+              .find(x => x.title === 'Создать комнату');
+            if (b) { b.click(); return true; }
+            return false;
+          })()
+        """)
+        await asyncio.sleep(0.8)
+        check("диалог создания комнаты открылся",
+              bool(await cdp.eval("!!document.querySelector('.dlg-card')")))
+
+        # вводим название и создаём
+        room_name = "проверка-" + str(int(time.time()))[-5:]
+        await cdp.eval("""
+          (() => {
+            const inp = document.querySelector('.dlg-card input');
+            const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            s.call(inp, %s);
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+          })()
+        """ % json.dumps(room_name))
+        await asyncio.sleep(0.3)
+        await cdp.eval("""
+          (() => {
+            const b = Array.from(document.querySelectorAll('.dlg-foot button'))
+              .find(x => x.textContent.trim() === 'Создать');
+            if (b) { b.click(); return true; }
+            return false;
+          })()
+        """)
+        await asyncio.sleep(2.5)
+        created = await cdp.eval("""
+          Array.from(document.querySelectorAll('.list-item .item-name'))
+            .some(e => e.textContent.trim() === %s)
+        """ % json.dumps(room_name))
+        check("комната появилась в списке", bool(created), room_name)
+        opened = await cdp.eval(
+            "(document.querySelector('.title-text') || {}).textContent === %s" % json.dumps(room_name))
+        check("новая комната сразу открыта", bool(opened))
+
         # ---- снимок ----
-        print("\n[5] снимок экрана")
+        print("\n[6] снимок экрана")
         shot = await cdp.send("Page.captureScreenshot", format="png")
         data = base64.b64decode(shot["data"])
         with open(OUT, "wb") as f:
