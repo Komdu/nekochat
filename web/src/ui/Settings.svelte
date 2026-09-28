@@ -6,6 +6,7 @@
   // поэтому применяется мгновенно и переживает перезагрузку.
   import { store } from "../lib/store.svelte";
   import { applyTheme, theme, type ThemeMode, type ThemeStyle } from "../lib/theme";
+  import { nsEnabled, setNsEnabled } from "../lib/ns";
   import Dialog from "./Dialog.svelte";
   import Avatar from "./Avatar.svelte";
 
@@ -18,6 +19,7 @@
   ];
 
   let cur = $state<{ style: ThemeStyle; mode: ThemeMode }>(theme());
+  let nsOn = $state(nsEnabled());
 
   function pick(style: ThemeStyle) {
     cur = { style, mode: cur.mode };
@@ -78,6 +80,31 @@
     </div>
     {#if cur.style === "oled"}
       <p class="note">У OLED светлая тема недоступна: чёрный — это суть темы.</p>
+    {/if}
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Микрофон</div>
+    <div class="row">
+      <div class="row-info">
+        <div class="row-name">Шумоподавление</div>
+        <div class="row-hint">
+          В Chrome и Edge это RNNoise из WebRTC — фильтр применяется браузером
+          к потоку микрофона. AEC и автоусиление оставлены выключенными.
+        </div>
+      </div>
+      <button
+        class="mode"
+        class:on={nsOn}
+        onclick={() => {
+          nsOn = !nsOn;
+          setNsEnabled(nsOn);
+          store.calls?.setNoiseSuppression(nsOn);
+        }}
+      >{nsOn ? "Вкл" : "Выкл"}</button>
+    </div>
+    {#if nsOn && store.calls?.noiseSuppression.err}
+      <p class="note warn">{store.calls.noiseSuppression.err}</p>
     {/if}
   </div>
 
@@ -199,6 +226,28 @@
   .note {
     font-size: 12px;
     color: var(--muted);
+  }
+  .note.warn {
+    color: var(--danger);
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .row-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .row-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .row-hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-top: 3px;
   }
   .me-row {
     display: flex;

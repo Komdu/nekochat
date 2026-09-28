@@ -10,6 +10,7 @@
 
 import type { WsEvent } from "./types";
 import { MK_AUDIO, MK_VIDEO, MFLAG_ROOM } from "./net";
+import { micConstraints, nsEnabled, setNsEnabled } from "./ns";
 
 export type CallPhase = "idle" | "outgoing" | "incoming" | "connecting" | "active" | "ended";
 
@@ -106,6 +107,48 @@ function b64decode(b64: string): Uint8Array {
   return out;
 }
 
+/**
+ * Исходник процессора воркера микрофона.
+ *
+ * Вынесен в отдельную функцию не для красоты: этот код должен проверяться в
+ * настоящем браузере, а для этого его надо суметь достать. Тест
+ * (tests/nko-mic-worklet.py) поднимает AudioWorklet с ровно этим исходником,
+ * кормит его синтетическим сигналом и проверяет, что wasm поднялся, а наружу
+ * идут кадры по FRAME_SAMPLES. Копия кода в тесте рано или поздно разошлась
+ * бы с настоящим, и тест врал бы.
+ */
+export function buildMicWorkletSource(): string {
+  return `
+      class MicCapture extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.frameN = ${FRAME_SAMPLES};
+          this.buf = new Float32Array(this.frameN);
+          this.filled = 0;
+        }
+        process(inputs) {
+          const input = inputs[0];
+          if (!input || !input[0]) return true;
+          const ch = input[0];
+          let off = 0;
+          while (off < ch.length) {
+            const room = this.frameN - this.filled;
+            const take = Math.min(room, ch.length - off);
+            this.buf.set(ch.subarray(off, off + take), this.filled);
+            this.filled += take;
+            off += take;
+            if (this.filled < this.frameN) return true;
+            const copy = new Float32Array(this.buf);
+            this.port.postMessage({ ev: "audio", pcm: copy }, [copy.buffer]);
+            this.filled = 0;
+          }
+          return true;
+        }
+      }
+      registerProcessor("mic-capture", MicCapture);
+  `;
+}
+
 export class CallEngine {
   private meId: number;
   private signal: (msg: Record<string, unknown>) => void;
@@ -157,6 +200,17 @@ export class CallEngine {
   private screenForceKey = false; // следующий кадр — ключевой
 
   onState: (s: CallState) => void = () => {};
+
+  /** Шумоподавление включено (выключатель в настройках). Читается один раз при
+   *  старте захвата: переключать на лету без перезапуска звонка смысла нет. */
+  nsOn = nsEnabled();
+
+  /** Применился ли шумодав: браузер подтвердил ограничение по дороге. */
+  nsReady = false;
+
+  /** Почему шумодав не работает (пусто — всё в порядке). Показываем в
+   *  настройках: молча не работающий фильтр хуже, чем честная надпись. */
+  nsErr = "";
 
   /** Бинарный канал для аудио/видео. null -> работаем по старому JSON-пути.
    *  Стенд ставит store.tsx (api.sendMedia). */
@@ -264,17 +318,35 @@ export class CallEngine {
     return !!(window as any).AudioEncoder && !!(window as any).AudioDecoder;
   }
 
-  /** Захват микрофона: пробуем без AEC/шумодава (Windows/WebView2 с ними возможен
-   *  deadlock аудио-графа при одновременном входе и выходе), фолбэк — дефолт. */
+  /** Захват микрофона.
+   *
+   *  Просим встроенный шумодав (в Chrome/Edge это RNNoise из WebRTC APM) и
+   *  отключаем AEC/AGC: в десктопе на WebView2 те давали deadlock аудио-графа,
+   *  а AGC в чате ещё и «дышит» громкостью.
+   *
+   *  Фолбэк — дефолтное ограничение: браузер может отказать на слишком узком
+   *  наборе опций, и лучше говорить с микрофона как есть, чем не говорить.
+   */
   private async grabMic(): Promise<{ stream: MediaStream; cfg: string }> {
+    const want = micConstraints(this.nsOn);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        audio: want,
         video: false,
       });
-      return { stream, cfg: "aec-off" };
-    } catch {
+      // Проверяем, что браузер действительно включил шумодав, а не проигнорировал
+      // запрос: молча не работающий фильтр хуже, чем честная надпись в логе.
+      const track = stream.getAudioTracks()[0];
+      const applied = track?.getSettings?.().noiseSuppression;
+      if (this.nsOn && applied === false) {
+        this.nsErr = "браузер проигнорировал noiseSuppression";
+      }
+      this.nsReady = this.nsOn ? applied !== false : false;
+      return { stream, cfg: `ns-${applied === true ? "on" : applied === false ? "off" : "?"}` };
+    } catch (err) {
+      this.dbg({ ev: "mic_ns_reject", err: String((err as Error)?.message ?? err) });
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this.nsReady = false;
       return { stream, cfg: "default" };
     }
   }
@@ -311,7 +383,9 @@ export class CallEngine {
       }
     }
     if (this.workletNode == null) {
-      // фолбэк: ScriptProcessor
+      // Фолбэк: ScriptProcessor, когда AudioWorklet в браузере недоступен.
+      // Шумодав здесь уже применён браузером к самому потоку микрофона,
+      // поэтому дополнительной обработки не требуется.
       const sp = ctx.createScriptProcessor(4096, 1, 1);
       sp.onaudioprocess = (e) => {
         if (this.state.muted) return;
@@ -396,37 +470,28 @@ export class CallEngine {
     audioData.close();
   }
 
-  /** Микрофон через AudioWorklet: 20мс-кадры приходят из аудио-потока по port.postMessage. */
+  /** Микрофон через AudioWorklet.
+   *
+   *  Воркер копит кванты по 128 сэмплов в кадр 20 мс (FRAME_SAMPLES) и отдаёт
+   *  ровно столько, сколько ждёт энкодер: раньше он слал каждый квант отдельным
+   *  кадром с меткой времени 20 мс, из-за чего метки разъезжались, а на провод
+   *  уходило ~375 пакетов в секунду вместо 50.
+   *
+   *  Если включён шумодав, обработка живёт здесь же: она идёт 50 раз в секунду,
+   *  и на главном потоке каждая задержка была бы слышна.
+   */
   private async mountWorklet(ctx: AudioContext, src: MediaStreamAudioSourceNode): Promise<void> {
-    const procSrc = `
-      class MicCapture extends AudioWorkletProcessor {
-        constructor() {
-          super();
-          this.port.onmessage = (e) => {
-            const data = e.data;
-            this.port.postMessage(data, [data.buffer]);
-          };
-        }
-        process(inputs, outputs) {
-          const input = inputs[0];
-          if (!input || !input[0]) return true;
-          const ch = input[0];
-          const copy = new Float32Array(ch.length);
-          copy.set(ch);
-          this.port.postMessage(copy, [copy.buffer]);
-          return true;
-        }
-      }
-      registerProcessor("mic-capture", MicCapture);
-    `;
+    const procSrc = buildMicWorkletSource();
     const url = URL.createObjectURL(new Blob([procSrc], { type: "application/javascript" }));
     try {
       await ctx.audioWorklet.addModule(url);
       const node = new AudioWorkletNode(ctx, "mic-capture");
       node.port.onmessage = (e: MessageEvent) => {
+        const d = e.data as { ev?: string; pcm?: Float32Array };
+        if (d?.ev !== "audio" || !d.pcm) return;
         if (this.state.muted) return;
         this.lastOnProc = performance.now();
-        this.pushFrame(e.data as Float32Array);
+        this.pushFrame(d.pcm);
       };
       src.connect(node);
       node.connect(ctx.destination);
@@ -860,8 +925,21 @@ export class CallEngine {
     this.end(reason);
   }
 
-  toggleMute(): void {
-    if (!this.encoder) return;
+  /** Включить/выключить шумодав. Применится со следующего захвата микрофона:
+   *  ограничения задаются в getUserMedia, а он вызывается на старте звонка. */
+  setNoiseSuppression(on: boolean): void {
+    this.nsOn = on;
+    setNsEnabled(on);
+    this.nsErr = "";
+  }
+
+  /** Состояние шумодава: просили ли включить, применил ли браузер, и если нет —
+   *  то почему. Для интерфейса и диагностики. */
+  get noiseSuppression(): { on: boolean; ready: boolean; err: string } {
+    return { on: this.nsOn, ready: this.nsReady, err: this.nsErr };
+  }
+
+  toggleMute(): void {    if (!this.encoder) return;
     const muted = !this.state.muted;
     if (this.stream) {
       const t = this.stream.getAudioTracks()[0];
