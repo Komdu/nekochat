@@ -267,6 +267,132 @@ async def main():
         closed = await cdp.eval("!document.querySelector('.dlg-card')")
         check("диалог закрылся по Esc", bool(closed))
 
+        # ---- профиль: имя, пароль, аватар ----
+        print("\n[6] профиль")
+        # диалог настроек после проверки тем закрыт по Esc — открываем заново
+        await cdp.eval("""
+          (() => {
+            const b = Array.from(document.querySelectorAll('.side-foot button'))
+              .find(x => x.title === 'Настройки');
+            if (b) { b.click(); return true; }
+            return false;
+          })()
+        """)
+        await asyncio.sleep(0.8)
+        has_name = await cdp.eval("""
+          Array.from(document.querySelectorAll('.dlg-card .field > span'))
+            .some(e => e.textContent.trim() === 'Отображаемое имени')
+        """.replace('Отображаемое имени', 'Отображаемое имя'))
+        check("есть поле отображаемого имени", bool(has_name))
+        has_pass = await cdp.eval("""
+          Array.from(document.querySelectorAll('.dlg-card .field > span'))
+            .some(e => e.textContent.trim() === 'Текущий пароль')
+        """)
+        check("есть блок смены пароля", bool(has_pass))
+        has_pick = await cdp.eval("!!document.querySelector('.dlg-card input[type=file]')")
+        check("есть выбор файла для аватарки", bool(has_pick))
+
+        new_name = "Проверка-" + str(int(time.time()))[-4:]
+        await cdp.eval("""
+          (() => {
+            const spans = Array.from(document.querySelectorAll('.dlg-card .field > span'));
+            const lbl = spans.find(e => e.textContent.trim() === 'Отображаемое имя');
+            const inp = lbl.parentElement.querySelector('input');
+            const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+            s.call(inp, %s);
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+          })()
+        """ % json.dumps(new_name))
+        await asyncio.sleep(0.3)
+        await cdp.eval("""
+          (() => {
+            const b = Array.from(document.querySelectorAll('.dlg-foot button'))
+              .find(x => x.textContent.trim() === 'Сохранить');
+            if (b) { b.click(); return true; }
+            return false;
+          })()
+        """)
+        await asyncio.sleep(2.0)
+        saved = await cdp.eval(
+            "JSON.parse(localStorage.getItem('nk.user') || '{}').display_name === %s" % json.dumps(new_name))
+        check("имя сохранилось в клиенте", bool(saved),
+              str(await cdp.eval("JSON.stringify(JSON.parse(localStorage.getItem('nk.user')||{}).display_name)")))
+        in_sidebar = await cdp.eval(
+            "(document.querySelector('.side-foot .me-name') || {}).textContent === %s" % json.dumps(new_name))
+        check("новое имя видно в списке без перезагрузки", bool(in_sidebar))
+
+        # неверный старый пароль: ошибка, а не молчание; сессия жива
+        await cdp.eval("""
+          (() => {
+            const b = Array.from(document.querySelectorAll('.side-foot button'))
+              .find(x => x.title === 'Настройки');
+            if (b) b.click();
+            return true;
+          })()
+        """)
+        await asyncio.sleep(0.7)
+        await cdp.eval("""
+          (() => {
+            const spans = Array.from(document.querySelectorAll('.dlg-card .field > span'));
+            const set = (label, val) => {
+              const lbl = spans.find(e => e.textContent.trim() === label);
+              if (!lbl) return false;
+              const inp = lbl.parentElement.querySelector('input');
+              const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+              s.call(inp, val);
+              inp.dispatchEvent(new Event('input', { bubbles: true }));
+              return true;
+            };
+            set('Текущий пароль', 'wrong-password');
+            set('Новый пароль', 'brandNew7pass');
+            set('Новый пароль ещё раз', 'brandNew7pass');
+            return true;
+          })()
+        """)
+        await asyncio.sleep(0.3)
+        await cdp.eval("""
+          (() => {
+            const b = Array.from(document.querySelectorAll('.dlg-card button'))
+              .find(x => x.textContent.trim() === 'Сменить пароль');
+            if (b) { b.click(); return true; }
+            return false;
+          })()
+        """)
+        await asyncio.sleep(1.5)
+        pass_err = await cdp.eval("((document.querySelector('.dlg-err') || {}).textContent || '')")
+        check("неверный старый пароль даёт ошибку", bool(pass_err), str(pass_err)[:100])
+        still_in = await cdp.eval("!!document.querySelector('.side')")
+        check("после неудачной смены пароля сессия жива", bool(still_in))
+
+        # аватар настоящим файлом
+        png_b64 = ("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAOklEQVR42u3OMQEAAAgDoC251a3g"
+                   "LwaSUGoQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                   "AAAAAAAAAAAAAADgvwZ0mAABZbQ3kwAAAABJRU5ErkJggg==")
+        await cdp.eval("""
+          (async () => {
+            const bin = atob(%s);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            const file = new File([arr], 'a.png', { type: 'image/png' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const inp = document.querySelector('.dlg-card input[type=file]');
+            inp.files = dt.files;
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          })()
+        """ % json.dumps(png_b64))
+        await asyncio.sleep(3.0)
+        av = await cdp.eval("JSON.parse(localStorage.getItem('nk.user')||{}).avatar")
+        check("аватар загрузился", bool(av), str(av))
+        shown = await cdp.eval("!!document.querySelector('.me-row .avatar img')")
+        check("картинка показана вместо инициалов", bool(shown))
+
+        await cdp.send("Input.dispatchKeyEvent", type="keyDown", key="Escape", code="Escape", windowsVirtualKeyCode=27)
+        await cdp.send("Input.dispatchKeyEvent", type="keyUp", key="Escape", code="Escape", windowsVirtualKeyCode=27)
+        await asyncio.sleep(0.5)
+
         # создание комнаты
         await cdp.eval("""
           (() => {
@@ -311,7 +437,7 @@ async def main():
         check("новая комната сразу открыта", bool(opened))
 
         # ---- снимок ----
-        print("\n[6] снимок экрана")
+        print("\n[7] снимок экрана")
         shot = await cdp.send("Page.captureScreenshot", format="png")
         data = base64.b64decode(shot["data"])
         with open(OUT, "wb") as f:

@@ -57,6 +57,9 @@ class Store {
   private noteTimer: number | null = null;
   private seen: Record<string, Set<string | number>> = {};
   private watchTimer: number | null = null;
+
+  /** Счётчик для обхода кэша картинок после смены аватарки. */
+  avatarBust = 0;
   /** Движок звонков. Создаётся, когда известен наш id (после логина). */
   calls: CallEngine | null = null;
 
@@ -231,11 +234,55 @@ class Store {
     await this.loadData();
   }
 
-  updateProfile(p: { bio?: string; status?: string; profile_color?: string }): Promise<void> {
-    return this.api.updateProfile(p).then(() => this.api.me()).then((me) => {
-      this.me = me;
-      saveJson(LS.user, me);
+  updateProfile(p: {
+    bio?: string;
+    status?: string;
+    profile_color?: string;
+    display_name?: string;
+  }): Promise<void> {
+    // Сервер возвращает обновлённого пользователя: сохраняем именно его, иначе
+    // смена имени осталась бы только на сервере, а в интерфейсе — до перезагрузки
+    return this.api.updateProfile(p).then((u) => {
+      this.me = u;
+      saveJson(LS.user, u);
+      this.refreshUserNames();
     });
+  }
+
+  changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    return this.api.changePassword(oldPassword, newPassword).then(() => undefined);
+  }
+
+  uploadAvatar(file: File): Promise<void> {
+    return this.api.uploadAvatar(file).then((u) => {
+      this.me = u;
+      saveJson(LS.user, u);
+      // Кэш картинок в браузере обойдёт: имя файла меняется, но URL прежний
+      this.avatarBust += 1;
+      this.refreshUserNames();
+    });
+  }
+
+  /** Подставляет обновлённого меня во все карты: имя мелькает в шапке чата,
+   *  в списке людей и в сообщениях уже отправленных. */
+  private refreshUserNames(): void {
+    const me = this.me;
+    if (!me) return;
+    const map: Record<number, User> = { ...this.usersMap, [me.id]: { ...this.usersMap[me.id], ...me } };
+    // поправить и пользователей в списке
+    this.users = this.users.map((u) => (u.id === me.id ? { ...u, ...me } : u));
+    // и подписи в уже загруженной истории: сообщения хранят копию автора
+    const msgs: Record<string, Msg[]> = {};
+    for (const [key, list] of Object.entries(this.msgs)) {
+      msgs[key] = list.map((m) => {
+        const uid = m.user?.id ?? m.sender?.id;
+        if (uid !== me.id) return m;
+        const author = { ...(m.user ?? m.sender), ...me };
+        return { ...m, ...(m.user ? { user: author } : { sender: author }) };
+      });
+    }
+    this.msgs = msgs;
+    this.usersMap = map;
   }
 
   async loadData(): Promise<void> {    try {

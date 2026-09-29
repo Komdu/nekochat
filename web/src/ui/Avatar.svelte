@@ -9,15 +9,21 @@
     user,
     size = 32,
     base = "",
+    bust = 0,
   }: {
     user?: Partial<User> | null;
     size?: number;
     /** базовый URL для /avatars/... — передаём из стора */
     base?: string;
+    /** счётчик смены аватарки: имя файла на сервере меняется, но браузер
+     *  кэширует по URL и показывал бы старую картинку. Добавляем метку. */
+    bust?: number;
   } = $props();
 
   const src = $derived(
-    user?.avatar && base ? `${base}/avatars/${encodeURIComponent(user.avatar)}` : "",
+    user?.avatar && base
+      ? `${base}/avatars/${encodeURIComponent(user.avatar)}${bust ? `?v=${bust}` : ""}`
+      : "",
   );
   const initials = $derived(
     (user?.display_name || user?.username || "?").trim().slice(0, 2).toUpperCase(),

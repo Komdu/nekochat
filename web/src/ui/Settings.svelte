@@ -32,15 +32,19 @@
   }
 
   // --- профиль ---
+  let display = $state(store.me?.display_name ?? "");
   let bio = $state(store.me?.bio ?? "");
   let status = $state(store.me?.status ?? "");
   let color = $state(store.me?.profile_color ?? "");
   let saving = $state(false);
+  let err = $state("");
 
   async function saveProfile() {
     saving = true;
+    err = "";
     try {
       await store.updateProfile({
+        display_name: display.trim(),
         bio: bio.trim(),
         status: status.trim(),
         profile_color: color.trim() || undefined,
@@ -48,9 +52,68 @@
       store.noteMsg("Профиль сохранён");
       open = false;
     } catch (e) {
-      store.noteMsg(e instanceof Error ? e.message : String(e));
+      err = e instanceof Error ? e.message : String(e);
     } finally {
       saving = false;
+    }
+  }
+
+  // --- аватар ---
+  let uploading = $state(false);
+
+  async function pickAvatar(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ""; // чтобы тот же файл можно было выбрать повторно
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      err = "Картинка больше 5 МБ";
+      return;
+    }
+    uploading = true;
+    err = "";
+    try {
+      await store.uploadAvatar(file);
+      store.noteMsg("Аватар обновлён");
+    } catch (e2) {
+      err = e2 instanceof Error ? e2.message : String(e2);
+    } finally {
+      uploading = false;
+    }
+  }
+
+  // --- пароль ---
+  let oldPass = $state("");
+  let newPass = $state("");
+  let newPass2 = $state("");
+  let passBusy = $state(false);
+  let passMsg = $state("");
+  let passErr = $state("");
+
+  async function savePassword() {
+    passErr = "";
+    passMsg = "";
+    if (newPass.length < 6) {
+      passErr = "Новый пароль короче 6 символов";
+      return;
+    }
+    if (newPass !== newPass2) {
+      passErr = "Новый пароль и подтверждение не совпадают";
+      return;
+    }
+    if (newPass === oldPass) {
+      passErr = "Новый пароль совпадает со старым";
+      return;
+    }
+    passBusy = true;
+    try {
+      await store.changePassword(oldPass, newPass);
+      oldPass = newPass = newPass2 = "";
+      passMsg = "Пароль изменён";
+    } catch (e) {
+      passErr = e instanceof Error ? e.message : String(e);
+    } finally {
+      passBusy = false;
     }
   }
 
@@ -111,12 +174,20 @@
   <div class="sec">
     <div class="sec-title">Профиль</div>
     <div class="me-row">
-      <Avatar user={store.me} size={44} base={store.base} />
+      <Avatar user={store.me} size={44} base={store.base} bust={store.avatarBust} />
       <div class="me-names">
         <div class="me-display">{store.me?.display_name || store.me?.username}</div>
-        <div class="me-user">@{store.me?.username}</div>
+        <div class="me-user">@{store.me?.username} — логин не меняется</div>
       </div>
+      <label class="pick" class:busy={uploading}>
+        {uploading ? "…" : "Сменить"}
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange={pickAvatar} />
+      </label>
     </div>
+    <label class="field">
+      <span>Отображаемое имя</span>
+      <input bind:value={display} maxlength="40" placeholder="как тебя показывать" />
+    </label>
     <label class="field">
       <span>Статус</span>
       <input bind:value={status} maxlength="80" placeholder="чем занят" />
@@ -139,6 +210,30 @@
         {/each}
       </div>
     </div>
+    {#if err}<div class="dlg-err">{err}</div>{/if}
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Пароль</div>
+    <label class="field">
+      <span>Текущий пароль</span>
+      <input type="password" bind:value={oldPass} autocomplete="current-password" />
+    </label>
+    <label class="field">
+      <span>Новый пароль</span>
+      <input type="password" bind:value={newPass} autocomplete="new-password" />
+    </label>
+    <label class="field">
+      <span>Новый пароль ещё раз</span>
+      <input type="password" bind:value={newPass2} autocomplete="new-password" />
+    </label>
+    {#if passErr}<div class="dlg-err">{passErr}</div>{/if}
+    {#if passMsg}<div class="dlg-ok">{passMsg}</div>{/if}
+    <button class="btn" onclick={savePassword} disabled={passBusy || !oldPass || !newPass}>
+      {passBusy ? "…" : "Сменить пароль"}
+    </button>
+    <p class="note">Старый пароль подтверждает, что это действительно ты. Вход в других
+      вкладках сохранится, но выданные ранее токены останутся в силе до истечения срока.</p>
   </div>
 
   {#snippet footer()}
@@ -253,6 +348,47 @@
     display: flex;
     align-items: center;
     gap: 11px;
+  }
+  /* Кнопка выбора файла: настоящий input прячем, а label на него смотрит —
+     нативный диалог открывается по клику в любом браузере. */
+  .pick {
+    position: relative;
+    overflow: hidden;
+    margin-left: auto;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--outline-variant);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pick:hover {
+    background: var(--panel-hover);
+  }
+  .pick.busy {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .pick input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .dlg-err {
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    color: var(--danger);
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+  .dlg-ok {
+    background: color-mix(in srgb, var(--ok) 16%, transparent);
+    color: var(--ok);
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 13px;
   }
   .me-display {
     font-size: 15px;

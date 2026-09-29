@@ -10,7 +10,14 @@
 
 import type { WsEvent } from "./types";
 import { MK_AUDIO, MK_VIDEO, MFLAG_ROOM } from "./net";
-import { micConstraints, nsEnabled, setNsEnabled } from "./ns";
+import {
+  createSpeexNode,
+  micConstraints,
+  nsEnabled,
+  planNoiseSuppression,
+  setNsEnabled,
+  type NsPlan,
+} from "./ns";
 
 export type CallPhase = "idle" | "outgoing" | "incoming" | "connecting" | "active" | "ended";
 
@@ -208,6 +215,13 @@ export class CallEngine {
   /** Применился ли шумодав: браузер подтвердил ограничение по дороге. */
   nsReady = false;
 
+  /** Чем именно фильтруем: Speex в воркере, встроенный фильтр браузера или
+   *  ничего. Определяется один раз перед getUserMedia. */
+  nsPlan: NsPlan = { mode: "off" };
+
+  /** Узел Speex в графе, если он есть. Сносится вместе с микрофоном. */
+  private speexNode: { node: AudioNode; destroy: () => void } | null = null;
+
   /** Почему шумодав не работает (пусто — всё в порядке). Показываем в
    *  настройках: молча не работающий фильтр хуже, чем честная надпись. */
   nsErr = "";
@@ -320,33 +334,39 @@ export class CallEngine {
 
   /** Захват микрофона.
    *
-   *  Просим встроенный шумодав (в Chrome/Edge это RNNoise из WebRTC APM) и
-   *  отключаем AEC/AGC: в десктопе на WebView2 те давали deadlock аудио-графа,
-   *  а AGC в чате ещё и «дышит» громкостью.
+   *  Сначала решаем, чем фильтровать (Speex в воркере либо встроенный фильтр
+   *  браузера), и только потом зовём getUserMedia: от этого зависит, просить ли
+   *  у браузера noiseSuppression. Два фильтра подряд дают артефакты.
+   *
+   *  AEC/AGC выключены намеренно: в десктопе на WebView2 они давали deadlock
+   *  аудио-графа, а AGC в чате ещё и «дышит» громкостью.
    *
    *  Фолбэк — дефолтное ограничение: браузер может отказать на слишком узком
    *  наборе опций, и лучше говорить с микрофона как есть, чем не говорить.
    */
   private async grabMic(): Promise<{ stream: MediaStream; cfg: string }> {
-    const want = micConstraints(this.nsOn);
+    this.nsPlan = await planNoiseSuppression(this.nsOn);
+    const plan = this.nsPlan;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: want,
+        audio: micConstraints(plan),
         video: false,
       });
-      // Проверяем, что браузер действительно включил шумодав, а не проигнорировал
-      // запрос: молча не работающий фильтр хуже, чем честная надпись в логе.
-      const track = stream.getAudioTracks()[0];
-      const applied = track?.getSettings?.().noiseSuppression;
-      if (this.nsOn && applied === false) {
-        this.nsErr = "браузер проигнорировал noiseSuppression";
+      if (plan.mode === "browser") {
+        // браузер мог проигнорировать запрос: молча не работающий шумодав хуже
+        // честной надписи, поэтому проверяем и пишем причину
+        const applied = stream.getAudioTracks()[0]?.getSettings?.().noiseSuppression;
+        this.nsReady = applied !== false;
+        if (applied === false) this.nsErr = "браузер проигнорировал noiseSuppression";
+        return { stream, cfg: `ns-browser-${applied === true ? "on" : applied === false ? "off" : "?"}` };
       }
-      this.nsReady = this.nsOn ? applied !== false : false;
-      return { stream, cfg: `ns-${applied === true ? "on" : applied === false ? "off" : "?"}` };
+      this.nsReady = plan.mode === "speex";
+      return { stream, cfg: `ns-${plan.mode}` };
     } catch (err) {
       this.dbg({ ev: "mic_ns_reject", err: String((err as Error)?.message ?? err) });
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       this.nsReady = false;
+      this.nsErr = "микрофон открылся без шумоподавления";
       return { stream, cfg: "default" };
     }
   }
@@ -374,10 +394,27 @@ export class CallEngine {
     this.dbg({ ev: "mic_ok", ctxRate: ctx.sampleRate, ctxBase: ctx.baseLatency ?? 0, micCfg: cfg, playSep: playCtx != null });
     const src = ctx.createMediaStreamSource(stream);
 
+    // Шумоподавление Speex ставится между микрофоном и нашим воркером:
+    //   микрофон -> Speex (режет шум) -> воркер (копит кадры по 20 мс)
+    let tapped: AudioNode = src;
+    if (this.nsPlan.mode === "speex") {
+      try {
+        this.speexNode = await createSpeexNode(ctx, this.nsPlan.wasm);
+        src.connect(this.speexNode.node);
+        tapped = this.speexNode.node;
+        this.dbg({ ev: "speex_in", ok: true });
+      } catch (err) {
+        this.speexNode = null;
+        this.nsReady = false;
+        this.nsErr = "Speex не встал в граф: " + String((err as Error)?.message ?? err);
+        this.dbg({ ev: "speex_in", ok: false, err: String(err) });
+      }
+    }
+
     // Каптура микрофона: AudioWorklet (устойчив в Chromium) с фолбэком на ScriptProcessor.
     if (ctx.audioWorklet) {
       try {
-        await this.mountWorklet(ctx, src);
+        await this.mountWorklet(ctx, tapped);
       } catch (err) {
         this.dbg({ ev: "worklet_fail", err: String((err as Error)?.message ?? err) });
       }
@@ -480,7 +517,7 @@ export class CallEngine {
    *  Если включён шумодав, обработка живёт здесь же: она идёт 50 раз в секунду,
    *  и на главном потоке каждая задержка была бы слышна.
    */
-  private async mountWorklet(ctx: AudioContext, src: MediaStreamAudioSourceNode): Promise<void> {
+  private async mountWorklet(ctx: AudioContext, src: AudioNode): Promise<void> {
     const procSrc = buildMicWorkletSource();
     const url = URL.createObjectURL(new Blob([procSrc], { type: "application/javascript" }));
     try {
@@ -690,6 +727,17 @@ export class CallEngine {
 
   private teardownAudio(): void {
     this.stopWatchdog();
+    // Узел Speex держит свой wasm-инстанс: без destroy() он переживёт звонок и
+    // будет копить память при каждом новом.
+    if (this.speexNode) {
+      try {
+        this.speexNode.node.disconnect();
+      } catch {
+        /* noop */
+      }
+      this.speexNode.destroy();
+      this.speexNode = null;
+    }
     if (this.workletNode) {
       try {
         this.workletNode.disconnect();

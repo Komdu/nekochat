@@ -169,8 +169,53 @@ export class ApiClient {
     return this.call<Msg[]>("GET", `/users/${otherId}/messages`);
   }
 
-  updateProfile(p: { bio?: string; status?: string; profile_color?: string }): Promise<unknown> {
-    return this.call("PUT", "/users/me/profile", p);
+  updateProfile(p: {
+    bio?: string;
+    status?: string;
+    profile_color?: string;
+    display_name?: string;
+  }): Promise<User> {
+    return this.call<User>("PUT", "/users/me/profile", p);
+  }
+
+  /** Смена пароля на свой. Старый обязателен — сервер проверяет. */
+  changePassword(oldPassword: string, newPassword: string): Promise<{ ok: boolean }> {
+    return this.call("PUT", "/users/me/password", {
+      old_password: oldPassword,
+      new_password: newPassword,
+    });
+  }
+
+  /** Загрузка аватарки.
+   *
+   *  Отдельный метод, а не через call(): файлы уходят multipart'ом, а call()
+   *  умеет только JSON. Content-Type задавать нельзя — границу проставляет
+   *  сам браузер, ручной заголовок ломает разбор. */
+  async uploadAvatar(file: File): Promise<User> {
+    const fd = new FormData();
+    fd.append("file", file, file.name || "avatar.png");
+    const headers: Record<string, string> = {};
+    if (this.token) headers["Authorization"] = `Bearer ${this.token}`;
+    const res = await fetch(`${this.base}/users/me/avatar`, {
+      method: "POST",
+      headers,
+      body: fd,
+    });
+    const text = await res.text();
+    let js: unknown = null;
+    if (text) {
+      try {
+        js = JSON.parse(text);
+      } catch {
+        js = null;
+      }
+    }
+    if (!res.ok) {
+      const d = (js as { detail?: unknown; error?: unknown }) ?? null;
+      const detail = (d && (d.detail || d.error)) || `HTTP ${res.status}`;
+      throw new Error(String(detail));
+    }
+    return js as User;
   }
 
   // ---- комнаты ----

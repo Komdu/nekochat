@@ -5,6 +5,7 @@ import "./app.css";
 import App from "./App.svelte";
 import { registerSW } from "./lib/registerSW";
 import { buildMicWorkletSource } from "./lib/calls";
+import { createSpeexNode, loadSpeexWasm, wasmUrl } from "./lib/ns";
 
 const root = document.getElementById("app");
 if (root) mount(App, { target: root });
@@ -12,10 +13,17 @@ if (root) mount(App, { target: root });
 // PWA: регистрация последней, чтобы не задерживать первую отрисовку
 registerSW();
 
-// Хук для тестов (только dev-сборка): отдаёт наружу исходник воркера микрофона.
-// Тест поднимает AudioWorklet с этим исходником и проверяет, что из него
-// выходят кадры ровно по 20 мс. Копировать код в тест нельзя — копия рано или
-// поздно разойдётся с настоящим, и тест будет врать.
+// Хуки для тестов (только dev-сборка):
+//  - исходник воркера микрофона, чтобы поднять AudioWorklet с РОВНО этим кодом
+//    и проверить размер кадра; копия кода в тесте рано или поздно разошлась бы;
+//  - функции шумоподавления, чтобы тест положил настоящий фильтр в настоящий
+//    аудио-граф и убедился, что он режет шум.
+// Копировать реализацию в тест нельзя — тест врал бы.
 if (import.meta.env.DEV) {
-  (window as unknown as Record<string, unknown>).__nkoMicSrc = buildMicWorkletSource();
+  const w = window as unknown as Record<string, unknown>;
+  w.__nkoMicSrc = buildMicWorkletSource();
+  w.__nkoSpeexWasm = wasmUrl();
+  w.__nkoNs = { loadSpeexWasm, createSpeexNode };
+  // подтягиваем wasm заранее: тест и первый звонок не ждут друг друга
+  void loadSpeexWasm();
 }

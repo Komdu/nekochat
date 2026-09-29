@@ -7,7 +7,8 @@ from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import DirectConversation, DirectMessage, User
-from ..schemas import DirectMessageOut, ProfileUpdate, UserOut
+from ..schemas import DirectMessageOut, PasswordChange, ProfileUpdate, UserOut
+from ..security import hash_password, verify_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -18,6 +19,27 @@ ALLOWED_TYPES = {
     "image/gif": "gif",
 }
 MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+# Сигнатуры файлов. Заголовок Content-Type приходит от клиента и ничего не
+# значит: мусор можно пометить как image/png, и сервер обязан это отсечь сам.
+_MAGIC = {
+    b"\x89PNG\r\n\x1a\n": "png",
+    b"\xff\xd8\xff": "jpg",
+    b"GIF87a": "gif",
+    b"GIF89a": "gif",
+}
+
+
+def _sniff_image(data: bytes) -> str | None:
+    """Формат по первым байтам, а не по заявленному Content-Type."""
+    for magic, ext in _MAGIC.items():
+        if data.startswith(magic):
+            return ext
+    # WebP: "RIFF" .... "WEBP" на 8-м байте
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
 
 
 def _resize_image(data: bytes, max_side: int, quality: int = 80) -> tuple[bytes, str] | None:
@@ -62,6 +84,13 @@ def upload_avatar(
         raise HTTPException(400, "Картинка больше 5 МБ")
     if not data:
         raise HTTPException(400, "Пустой файл")
+    # Сверяем заявленный тип с настоящим: иначе под видом картинки на сервер
+    # можно положить что угодно и получить обратно уже с картиночным
+    # Content-Type из /avatars/.
+    real = _sniff_image(data)
+    if real is None:
+        raise HTTPException(400, "Это не картинка")
+    ext = real
     # аватарки живут в маленьких кружках: жмём в WebP ≤192px, чтобы картинка
     # быстро доходила даже через медленный туннель (большие PNG не грузились)
     resized = _resize_image(data, 192, 80)
@@ -92,6 +121,16 @@ def update_profile(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if payload.display_name is not None:
+        name = payload.display_name.strip()
+        if not name:
+            raise HTTPException(400, "Имя не может быть пустым")
+        if len(name) > 40:
+            raise HTTPException(400, "Имя длиннее 40 символов")
+        # управляющие символы ломают разметку в списках и заголовках чата
+        if any(ord(ch) < 32 for ch in name):
+            raise HTTPException(400, "В имени нельзя использовать невидимые символы")
+        user.display_name = name
     if payload.bio is not None:
         user.bio = payload.bio.strip() or None
     if payload.status is not None:
@@ -104,6 +143,39 @@ def update_profile(
     db.commit()
     db.refresh(user)
     return UserOut.model_validate(user)
+
+
+@router.put("/me/password")
+def change_password(
+    payload: PasswordChange,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Смена пароля на свой.
+
+    Старый пароль обязателен: иначе утёкший токен позволил бы захватить
+    аккаунт навсегда — пароль стал бы единственным, что отличает хозяина от
+    вора, а он бы уже утек.
+
+    Новый пароль — ровно тот, что ввёл человек. Никаких генераций: смысл
+    смены в том, чтобы поставить свой, известный только тебе пароль.
+    """
+    if not verify_password(payload.old_password, user.password_hash):
+        raise HTTPException(400, "Старый пароль неверный")
+    new = payload.new_password
+    if len(new) < 6:
+        raise HTTPException(400, "Новый пароль короче 6 символов")
+    if len(new) > 256:
+        raise HTTPException(400, "Новый пароль длиннее 256 символов")
+    if new == payload.old_password:
+        raise HTTPException(400, "Новый пароль совпадает со старым")
+    user.password_hash = hash_password(new)
+    db.commit()
+    # Текущий токен остаётся рабочим: он подписан по sub=user.id, а не по
+    # паролю, иначе смена пароля выкидывала бы из всех вкладок сразу.
+    # Выданные ранее токены остаются действительными до истечения exp —
+    # отзывать их сервер не умеет, это осознанный компромисс.
+    return {"ok": True}
 
 
 @router.post("/me/banner", response_model=UserOut)

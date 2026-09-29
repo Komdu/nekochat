@@ -33,6 +33,15 @@ class ProfileUpdate(BaseModel):
     bio: str | None = None
     profile_color: str | None = None
     status: str | None = None
+    display_name: str | None = None
+
+
+class PasswordChange(BaseModel):
+    """Смена пароля. Требуем старый: иначе токен, попавший в чужие руки,
+    позволил бы захватить аккаунт навсегда."""
+
+    old_password: str
+    new_password: str
 
 
 class Token(BaseModel):
