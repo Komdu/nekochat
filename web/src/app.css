@@ -399,3 +399,15 @@ html[data-theme="win98"] .note-bar {
   color: #000;
   border-radius: 0;
 }
+
+/* Панель передач файлов — тоже объёмная в win98. */
+html[data-theme="win98"] .files-panel {
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 0;
+}
+html[data-theme="win98"] .files-panel .tab,
+html[data-theme="win98"] .files-panel .file-row,
+html[data-theme="win98"] .files-panel .file-dl {
+  border-radius: 0;
+}

@@ -4,8 +4,9 @@
 // вместо useState/useEffect, а реактивность обеспечивает сам рантайм. WS-логика
 // (heartbeat, ретраи, ре-анонс канала) сохранена один в один — она проверена.
 
-import { ApiClient } from "./net";
+import { ApiClient, MK_FILE } from "./net";
 import { CallEngine, type CallState } from "./calls";
+import { FileManager, type Transfer } from "./files";
 import { pluralized } from "./format";
 import type { Conversation, Current, Msg, Room, User, WsEvent } from "./types";
 
@@ -63,14 +64,99 @@ class Store {
   /** Движок звонков. Создаётся, когда известен наш id (после логина). */
   calls: CallEngine | null = null;
 
+  /** Менеджер передачи файлов. */
+  files = new FileManager();
+
+  /** Список текущих и недавних передач — входящих и исходящих. */
+  transfers = $state<Transfer[]>([]);
+
+  private addTransfer(t: Transfer): void {
+    const i = this.transfers.findIndex((x) => x.key === t.key);
+    if (i >= 0) this.transfers[i] = t;
+    else this.transfers = [t, ...this.transfers];
+    // подчищаем: незавершённых не больше 8, готовые живут час
+    const now = Date.now();
+    this.transfers = this.transfers
+      .filter((x) => now - x.startedAt < 60 * 60 * 1000)
+      .slice(0, 12);
+  }
+
+  /** Отправить файл в текущий чат. */
+  async sendFile(file: File): Promise<void> {
+    const cur = this.current;
+    if (!cur) {
+      this.noteMsg("Сначала выбери чат");
+      return;
+    }
+    const peerName =
+      cur.kind === "dm"
+        ? this.usersMap[Number(cur.id)]?.display_name || this.usersMap[Number(cur.id)]?.username
+        : this.rooms.find((r) => String(r.id) === cur.id)?.name;
+    await this.files.send(
+      file,
+      cur.kind === "dm" ? { peerId: Number(cur.id), peerName } : { roomId: Number(cur.id), peerName },
+      (flags, target, payload) => {
+        // сокет передач мог быть закрыт: поднимаем и пробуем снова
+        if (!this.api.transferReady) {
+          this.api.wsMediaOpen("transfer", false);
+          return false;
+        }
+        return this.api.sendFileFrame(flags, target, payload);
+      },
+      (t) => this.addTransfer(t),
+      (t) => {
+        if (t.state === "done") this.noteMsg(`Файл «${t.name}» отправлен`);
+        else if (t.error) this.noteMsg(t.error);
+      },
+    );
+  }
+
+  /** Отправить файл конкретному человеку или в комнату (из списка). */
+  sendFileTo(file: File, target: { peerId?: number; roomId?: number; peerName?: string }): void {
+    void this.files.send(
+      file,
+      target,
+      (flags, addr, payload) => {
+        if (!this.api.transferReady) {
+          this.api.wsMediaOpen("transfer", false);
+          return false;
+        }
+        return this.api.sendFileFrame(flags, addr, payload);
+      },
+      (t) => this.addTransfer(t),
+      (t) => {
+        if (t.state === "done") this.noteMsg(`Файл «${t.name}» отправлен`);
+      },
+    );
+  }
+
+  private initFiles(): void {
+    this.files.onAck = (flags, target, payload) => this.api.sendFileFrame(flags, target, payload);
+  }
+
   constructor() {
     this.wire();
     void this.boot();
   }
 
   // ---------------- производные ----------------
-  get list(): Array<{ kind: "room" | "dm"; id: string; label: string; sub: string }> {
-    const out: Array<{ kind: "room" | "dm"; id: string; label: string; sub: string }> = [];
+  get list(): Array<{
+    kind: "room" | "dm";
+    id: string;
+    label: string;
+    sub: string;
+    /** для личных чатов — сам пользователь, чтобы показать аватарку и статус */
+    user?: User;
+    room?: Room;
+  }> {
+    const out: Array<{
+      kind: "room" | "dm";
+      id: string;
+      label: string;
+      sub: string;
+      user?: User;
+      room?: Room;
+    }> = [];
     for (const r of this.rooms) {
       const n = r.member_count ?? r.members?.length ?? 0;
       out.push({
@@ -78,12 +164,21 @@ class Store {
         id: String(r.id),
         label: r.name,
         sub: pluralized(n, "участник", "участника", "участников"),
+        room: r,
       });
     }
     const meId = this.me?.id;
     for (const u of this.users) {
       if (u.id === meId) continue;
-      out.push({ kind: "dm", id: String(u.id), label: u.display_name || u.username, sub: "@" + u.username });
+      // берём из кэша: там лежит профиль посвежее, чем в /users
+      const full = this.usersMap[u.id] ? { ...u, ...this.usersMap[u.id] } : u;
+      out.push({
+        kind: "dm",
+        id: String(u.id),
+        label: full.display_name || full.username,
+        sub: this.isOnline(full) ? "в сети" : "@" + full.username,
+        user: full,
+      });
     }
     return out;
   }
@@ -146,6 +241,7 @@ class Store {
     this.phase = "ready";
     this.api.wsOpen();
     this.api.wsMediaOpen("media");
+    this.api.wsMediaOpen("transfer");
     this.ensureCalls(user.id);
     void this.loadData();
   }
@@ -209,6 +305,7 @@ class Store {
     this.phase = "ready";
     this.api.wsOpen();
     this.api.wsMediaOpen("media");
+    this.api.wsMediaOpen("transfer");
     this.ensureCalls(saved.id);
     // сервер мог перезапуститься / туннель моргнул — пробуем несколько раз
     const attempt = async (n: number): Promise<void> => {
@@ -358,14 +455,19 @@ class Store {
 
   // ---------------- события WS ----------------
   private wire(): void {
+    this.initFiles();
     this.api.onWsError = (m) => {
       if (m) this.noteMsg(m);
     };
     this.api.onAuthFailed = (m) => this.logout();
     this.api.onWs = (ev) => this.onEvent(ev);
     this.api.onWsReconnected = () => void this.loadData();
-    // бинарные кадры аудио/видео -> движок звонков
+    // бинарные кадры: аудио/видео -> движок звонков, файлы -> менеджер передач
     this.api.onWsMedia = (kind, flags, from, payload) => {
+      if (kind === MK_FILE) {
+        void this.files.onFrame(flags, from, payload, (t) => this.addTransfer(t));
+        return;
+      }
       this.calls?.handleMedia(kind, flags, from, payload);
     };
     // голосовой канал переживает обрыв: сокет поднимется, движок переанонсирует

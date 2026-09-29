@@ -7,10 +7,28 @@
   import Dialog from "./Dialog.svelte";
   import Settings from "./Settings.svelte";
   import CreateRoom from "./CreateRoom.svelte";
+  import FilesPanel from "./FilesPanel.svelte";
 
   let draft = $state("");
   let showSettings = $state(false);
   let showCreate = $state(false);
+
+  /** Файлы прикрепляются скрепкой. Диалог нативный — он работает везде. */
+  let sending = $state(false);
+  async function pickFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    sending = true;
+    try {
+      await store.sendFile(file);
+    } catch (err) {
+      store.noteMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      sending = false;
+    }
+  }
 
   const msgs = $derived(store.messages);
   const cur = $derived(store.current);
@@ -78,10 +96,18 @@
           class="list-item"
           class:active={cur?.kind === item.kind && cur?.id === item.id}
           onclick={() => (item.kind === "room"
-            ? store.selectRoom({ id: Number(item.id), name: item.label })
-            : store.selectUser({ id: Number(item.id), username: item.label, display_name: item.label }))}
+            ? store.selectRoom(item.room ?? { id: Number(item.id), name: item.label })
+            : store.selectUser(item.user ?? { id: Number(item.id), username: item.label, display_name: item.label }))}
         >
-          <span class="item-mark">{item.kind === "room" ? "#" : "@"}</span>
+          <!-- личные чаты показываем аватаркой, комнаты — решёткой -->
+          {#if item.user}
+            <span class="item-avatar">
+              <Avatar user={item.user} size={28} base={store.base} />
+              {#if store.isOnline(item.user)}<span class="item-online"></span>{/if}
+            </span>
+          {:else}
+            <span class="item-mark">#</span>
+          {/if}
           <span class="item-info">
             <span class="item-name">{item.label}</span>
             <span class="item-sub">{item.sub}</span>
@@ -156,7 +182,14 @@
       {/if}
     </div>
 
+    <FilesPanel />
+
     <div class="composer">
+      <label class="clip" class:disabled={!cur} title="Прикрепить файл">
+        <Icon name="mail" size={17} />
+        {#if sending}<span class="clip-spin"></span>{/if}
+        <input type="file" disabled={!cur} onchange={pickFile} />
+      </label>
       <textarea
         class="composer-input"
         rows="1"
@@ -270,6 +303,22 @@
     align-items: center;
     justify-content: center;
     flex: none;
+  }
+  /* аватарка в списке: 28px, как и круг, но с точкой «в сети» в углу */
+  .item-avatar {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+  }
+  .item-online {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 2px var(--panel);
   }
   .list-item.active .item-mark {
     background: var(--primary);
@@ -460,6 +509,53 @@
   .composer {
     flex: none;
     padding: 4px 20px 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  /* скрепка: input скрыт, клик по label открывает нативный диалог */
+  .clip {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    margin-bottom: 4px;
+    border-radius: 999px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .clip:hover {
+    background: var(--panel-hover);
+    color: var(--text1);
+  }
+  .clip.disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .clip input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .clip-spin {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    border-top-color: transparent;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
   .composer-input {
     width: 100%;

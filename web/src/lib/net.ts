@@ -554,4 +554,21 @@ export class ApiClient {
   get mediaReady(): boolean {
     return !!this.wsMedia && this.wsMedia.readyState === WebSocket.OPEN;
   }
+
+  /** Отправить файловый кадр. Файлы идут по отдельному сокету /ws/transfer:
+   *  у них самый низкий приоритет, и на том же сокете они вытесняли бы голос. */
+  sendFileFrame(flags: number, target: number, payload: Uint8Array): boolean {
+    const ws = this.wsTransfer;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(packMedia(MK_FILE, flags, target, payload));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  get transferReady(): boolean {
+    return !!this.wsTransfer && this.wsTransfer.readyState === WebSocket.OPEN;
+  }
 }
