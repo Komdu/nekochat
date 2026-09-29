@@ -6,6 +6,7 @@ import App from "./App.svelte";
 import { registerSW } from "./lib/registerSW";
 import { buildMicWorkletSource } from "./lib/calls";
 import { createSpeexNode, loadSpeexWasm, wasmUrl } from "./lib/ns";
+import { store } from "./lib/store.svelte";
 
 const root = document.getElementById("app");
 if (root) mount(App, { target: root });
@@ -24,6 +25,8 @@ if (import.meta.env.DEV) {
   w.__nkoMicSrc = buildMicWorkletSource();
   w.__nkoSpeexWasm = wasmUrl();
   w.__nkoNs = { loadSpeexWasm, createSpeexNode };
+  w.__nkoStore = store;
+  w.__nkoApi = store.api;
   // подтягиваем wasm заранее: тест и первый звонок не ждут друг друга
   void loadSpeexWasm();
 }

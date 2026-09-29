@@ -115,6 +115,12 @@ export class FileManager {
     canSend: (flags: number, target: number, payload: Uint8Array) => boolean,
     onChange: (t: Transfer) => void,
     onDone: (t: Transfer) => void,
+    /** Готов ли канал. Опрос вместо одноразовой проверки: сокет передач
+     *  открывается при входе и может быть ещё в CONNECTING, когда пользователь
+     *  уже прикрепил файл. Одноразовая проверка давала «канал не готов» на
+     *  живом сокете. */
+    ready: () => boolean = () => true,
+    open: () => void = () => {},
   ): Promise<Transfer> {
     const stream = 1 + Math.floor(Math.random() * STREAM_MASK);
     const t: Transfer = {
@@ -133,11 +139,12 @@ export class FileManager {
     };
 
     const flagsBase = (target.roomId ? FLAG_ROOM : 0) | (stream << STREAM_SHIFT);
-    // сокет мог быть не открыт: поднимаем и ждём готовности
-    if (!canSend(flagsBase, this.addr(target), new Uint8Array(0))) {
+    // Ждём канал: поднимаем, если закрыт, и даём ему до 3 с на CONNECTING.
+    if (!(await this.waitChannel(ready, open, 3000))) {
       t.state = "error";
-      t.error = "канал передачи не готов";
+      t.error = "канал передачи не открылся — проверь интернет и попробуй снова";
       onChange(t);
+      onDone(t);
       return t;
     }
 
@@ -196,6 +203,22 @@ export class FileManager {
 
   private addr(t: { peerId?: number; roomId?: number }): number {
     return t.roomId ? (t.roomId as number) : (t.peerId as number);
+  }
+
+  /** Дождаться готовности канала. Пытаемся открыть и опрашиваем. */
+  private async waitChannel(
+    ready: () => boolean,
+    open: () => void,
+    timeout: number,
+  ): Promise<boolean> {
+    if (ready()) return true;
+    open();
+    const until = Date.now() + timeout;
+    while (Date.now() < until) {
+      if (ready()) return true;
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    return ready();
   }
 
   /** Отпустить занятый слот передачи: пустой последний кадр с тем же stream_id. */

@@ -95,19 +95,14 @@ class Store {
     await this.files.send(
       file,
       cur.kind === "dm" ? { peerId: Number(cur.id), peerName } : { roomId: Number(cur.id), peerName },
-      (flags, target, payload) => {
-        // сокет передач мог быть закрыт: поднимаем и пробуем снова
-        if (!this.api.transferReady) {
-          this.api.wsMediaOpen("transfer", false);
-          return false;
-        }
-        return this.api.sendFileFrame(flags, target, payload);
-      },
+      (flags, target, payload) => this.api.sendFileFrame(flags, target, payload),
       (t) => this.addTransfer(t),
       (t) => {
         if (t.state === "done") this.noteMsg(`Файл «${t.name}» отправлен`);
         else if (t.error) this.noteMsg(t.error);
       },
+      () => this.api.transferReady,
+      () => this.api.wsMediaOpen("transfer", false),
     );
   }
 
@@ -116,17 +111,14 @@ class Store {
     void this.files.send(
       file,
       target,
-      (flags, addr, payload) => {
-        if (!this.api.transferReady) {
-          this.api.wsMediaOpen("transfer", false);
-          return false;
-        }
-        return this.api.sendFileFrame(flags, addr, payload);
-      },
+      (flags, addr, payload) => this.api.sendFileFrame(flags, addr, payload),
       (t) => this.addTransfer(t),
       (t) => {
         if (t.state === "done") this.noteMsg(`Файл «${t.name}» отправлен`);
+        else if (t.error) this.noteMsg(t.error);
       },
+      () => this.api.transferReady,
+      () => this.api.wsMediaOpen("transfer", false),
     );
   }
 
