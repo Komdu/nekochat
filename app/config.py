@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     transfer_max_per_room: int = 3
     room_members_cache_s: int = 30        # кэш участников комнаты для медиа-релея
 
+    # ---- заголовок клиента ----
+    # Кто прислал запрос: имя, версия, ОС. Нужен для чек-версии и статистики.
+    client_header_strict: bool = False    # ронять запросы без заголовка
+    client_min_version: str = ""          # ниже — предупреждение (не отказ)
+    client_header_name: str = "X-Neko-Client"
+
     class Config:
         env_file = ".env"
 

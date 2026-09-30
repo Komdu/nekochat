@@ -1,45 +1,6 @@
-# ---- Python ----
-__pycache__/
-*.pyc
-.venv/
-venv/
-.venv-build/
-venv-build/
-venv-dev/
-venv-server/
-build/
-dist/
-*.egg-info/
+# Локальные файлы, которые НЕ должны попасть в публичный репозиторий.
+# Метка клиента сюда не попадает: она приходит из переменной окружения
+# NKO_CLIENT_ID при сборке (см. web/vite.config.ts), поэтому коммитить нечего.
 
-# ---- Runtime / data ----
-app/avatars/
-*.db
-*.sqlite3
-
-# ---- Secrets ----
 .env
-.env.local
-*.pem
-ssh.json
-*_token
-nekochat_cli.token
-
-# ---- Node / Rust (desktop) ----
-node_modules/
-desktop/dist/
-desktop/src-tauri/target/
-desktop/src-tauri/gen/
-*.tsbuildinfo
-
-# ---- Deploy / release artifacts ----
-*.tar
-*.tar.gz
-releases/
-
-# ---- OS / editor ----
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-# ?????? Svelte-??????? (????????? ? web/)
-app/static/web_next/
+*.local

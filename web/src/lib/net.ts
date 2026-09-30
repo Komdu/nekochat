@@ -6,6 +6,7 @@
 // NATS-транспорт, HTTP/SSE-транспорт и чтение theme.json через Tauri.
 
 import type { AuthResult, Conversation, Msg, Room, User, WsEvent } from "./types";
+import { clientHeaderValue, clientQueryValue, CLIENT_HEADER } from "./ident";
 
 /** Сколько тишины (пинги идут, ответа нет) считаем «мёртвым» соединением. */
 const WS_SILENT_MS = 45000;
@@ -95,6 +96,9 @@ export class ApiClient {
     const headers: Record<string, string> = {};
     if (payload !== undefined) headers["Content-Type"] = "application/json";
     if (auth && this.token) headers["Authorization"] = `Bearer ${this.token}`;
+    // Заголовок клиента: имя, версия, ОС, метка сборки. Сервер по нему
+    // предупреждает об устаревшей версии и ведёт статистику.
+    headers[CLIENT_HEADER] = clientHeaderValue();
     const controller = new AbortController();
     const to = window.setTimeout(() => controller.abort(), 15000);
     let res: Response;
@@ -296,7 +300,10 @@ export class ApiClient {
       this.wsRetryDelay = 1000;
     }
     const url = this.base.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:") +
-      "/ws?token=" + encodeURIComponent(this.token);
+      "/ws?token=" + encodeURIComponent(this.token) +
+      // WebSocket из браузера не умеет заголовки, поэтому клиент едет
+      // параметром URL — сервер понимает оба способа
+      "&c=" + clientQueryValue();
     let ws: WebSocket;
     try {
       ws = new WebSocket(url);
@@ -430,7 +437,8 @@ export class ApiClient {
   private mediaUrl(channel: "media" | "transfer"): string {
     return (
       this.base.replace(/^http:/i, "ws:").replace(/^https:/i, "wss:") +
-      "/ws/" + channel + "?token=" + encodeURIComponent(this.token || "")
+      "/ws/" + channel + "?token=" + encodeURIComponent(this.token || "") +
+      "&c=" + clientQueryValue()
     );
   }
 

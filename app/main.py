@@ -50,6 +50,38 @@ class NoCacheHTML(BaseHTTPMiddleware):
         return response
 
 
+class ClientHeader(BaseHTTPMiddleware):
+    """Разбирает заголовок клиента и кладёт результат в request.state.
+
+    Строгий режим (client_header_strict) выключен по умолчанию намеренно:
+    заголовок приходит от того, кого мы опознаём, поэтому подделать его так же
+    просто, как послать. Зато отказ ломает всё, что не наш клиент: curl,
+    скрипты, health-чеки, сторонние интеграции. Польза при нулевой защите не
+    окупает такую цену. Включается одним флагом.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        from .client_header import HEADER, WS_PARAM, parse, stats
+
+        raw = request.headers.get(HEADER) or request.headers.get(HEADER.lower())
+        if not raw:
+            # из браузера WebSocket не умеет заголовки — там тот же хвост
+            # едет параметром в URL (net.ts добавляет c=...)
+            raw = request.query_params.get(WS_PARAM)
+        info = parse(raw)
+        stats.note(info)
+        request.state.client = info
+        if not info.name and settings.client_header_strict:
+            stats.rejected += 1
+            return JSONResponse(
+                {"error": "client_header not found! please update",
+                 "detail": f"добавь заголовок {settings.client_header_name}: "
+                           "имя/версия (ос) build=метка"},
+                status_code=400,
+            )
+        return await call_next(request)
+
+
 # /api/docs — Swagger UI для REST-API, спек — /api/openapi.json.
 # /docs — общая документация проекта (рендер из docs/).
 
@@ -217,6 +249,9 @@ def _custom_openapi():
 app.openapi = _custom_openapi
 
 app.add_middleware(NoCacheHTML)
+# Заголовок клиента: разбор идёт всегда, отказ — только при client_header_strict
+# (по умолчанию выключено, см. ClientHeader)
+app.add_middleware(ClientHeader)
 
 app.add_middleware(
     CORSMiddleware,
@@ -238,7 +273,10 @@ app.include_router(admin.router)
 
 
 @app.get("/api/me", response_model=dict)
-def me(user: User = Depends(get_current_user)):
+def me(request: Request, user: User = Depends(get_current_user)):
+    from .client_header import parse
+
+    info = parse(request.headers.get(settings.client_header_name) or request.query_params.get("c"))
     return {
         "id": user.id,
         "username": user.username,
@@ -249,7 +287,21 @@ def me(user: User = Depends(get_current_user)):
         "status": user.status,
         "banner": user.banner,
         "is_online": user.is_online,
+        # чем сидит и какая версия: /api/me возвращает это самому клиенту,
+        # /users — про всех остальных
+        "client": info.as_dict(),
+        "min_version": settings.client_min_version,
     }
+
+
+@app.get("/api/client-stats", response_model=dict)
+def client_stats():
+    """Кто и чем заходит. Открытый эндпоинт: там нет ничего, что не видно
+    из самого заголовка, — просто счётчики, чтобы смотреть глазами, а не по
+    логам."""
+    from .client_header import stats
+
+    return stats.as_dict()
 
 
 def _static_dir() -> Path:
