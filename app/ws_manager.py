@@ -56,6 +56,26 @@ class ConnectionManager:
     def online_user_ids(self) -> set[int]:
         return set(self.active.keys()) | set(self.sse.keys()) | set(self.nats.keys())
 
+    async def broadcast(self, payload: dict, exclude: set[int] | None = None):
+        """Разослать всем на связи. Нужно для присутствия: сменил человек
+        статус — узнать об этом должны все, а не только тот, кто его спросил.
+
+        exclude — тех, кто уже знает (обычно сам автор: он и так видит свой
+        профиль)."""
+        skip = exclude or set()
+        targets = (set(self.active) | set(self.sse) | set(self.nats)) - skip
+        if not targets:
+            return 0
+        sent = 0
+        for uid in list(targets):
+            try:
+                await self.send_to_user(uid, payload)
+                sent += 1
+            except Exception:
+                # один мёртвый сокет не должен ронять рассылку остальным
+                continue
+        return sent
+
     async def send_to_user(self, user_id: int, payload: dict):
         sockets = list(self.active.get(user_id, set()))
         queues = list(self.sse.get(user_id, set()))
@@ -94,6 +114,35 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+# Главный event loop сервера. Нужен, чтобы из СИНХРОННЫХ эндпоинтов отправлять
+# асинхронные рассылки: FastAPI выполняет sync-обработчики в пуле потоков, где
+# get_running_loop() падает. Без этого молча теряется всё, что разослать из
+# /users/me/profile — то есть смена статуса, имени или аватарки.
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_loop(loop: asyncio.AbstractEventLoop) -> None:
+    global _loop
+    _loop = loop
+
+
+def spawn(coro) -> bool:
+    """Запустить корутину из чужого потока, не дожидаясь её.
+
+    Именно run_coroutine_threadsafe, а не create_task: вызов приходит из пула
+    потоков, а не с event loop.
+    """
+    if _loop is None or _loop.is_closed():
+        coro.close()
+        return False
+    try:
+        asyncio.run_coroutine_threadsafe(coro, _loop)
+        return True
+    except RuntimeError:
+        coro.close()
+        return False
 
 
 def auth_token(token: str | None) -> int | None:

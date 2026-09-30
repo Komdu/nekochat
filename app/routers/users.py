@@ -142,7 +142,48 @@ def update_profile(
         user.profile_color = color or None
     db.commit()
     db.refresh(user)
+    # Статус, имя и аватар — это присутствие: без рассылки остальные
+    # продолжат видеть старое значение, пока не перезагрузят страницу.
+    _broadcast_presence(user)
     return UserOut.model_validate(user)
+
+
+def _broadcast_presence(user: User) -> None:
+    """Сообщить всем, что у человека изменилось то, что видно рядом с ником.
+
+    Отдельным событием, а не в общий поток сообщений: получателям не нужен
+    текст, им нужен новый статус.
+    """
+    from ..ws_manager import manager, spawn
+
+    payload = {
+        "type": "presence_update",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name,
+            "avatar": user.avatar,
+            "bio": user.bio,
+            "status": user.status,
+            "profile_color": user.profile_color,
+            "is_online": user.is_online,
+        },
+    }
+    # Автору событие не нужно: он и так видит свой профиль, а лишнее событие
+    # дёрнуло бы у него перерисовку списка.
+    _spawn(manager.broadcast(payload, exclude={user.id}))
+
+
+def _spawn(coro) -> None:
+    """Отправить рассылку из синхронного эндпоинта.
+
+    Этот обработчик FastAPI выполняет в пуле потоков, а не на event loop:
+    get_running_loop() здесь падает, и рассылка молча терялась бы. Поэтому
+    запуск идёт через run_coroutine_threadsafe на loop, сохранённый при старте.
+    """
+    from ..ws_manager import spawn
+
+    spawn(coro)
 
 
 @router.put("/me/password")

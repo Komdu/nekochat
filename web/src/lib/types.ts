@@ -48,6 +48,9 @@ export interface WsEvent {
   conversation_id?: number;
   from_id?: number;
   message?: Msg;
+  // presence_update: изменилось то, что видно рядом с ником (статус, имя,
+  // аватарка). Приходит всем, кто на связи, кроме самого автора
+  user?: User;
   // сигналинг звонков (сервер — реле; аудио идёт Opus по бинарному сокету)
   to_id?: number | string;
   call_id?: string | null;

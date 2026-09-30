@@ -88,6 +88,14 @@ class ClientHeader(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Запоминаем главный loop: из синхронных эндпоинтов (а /users/me/profile
+    # именно такой) рассылки идут через run_coroutine_threadsafe — в пуле
+    # потоков своего loop нет.
+    import asyncio as _asyncio
+
+    from .ws_manager import set_loop
+
+    set_loop(_asyncio.get_running_loop())
     await nats_bridge.start()
     yield
     await nats_bridge.stop()

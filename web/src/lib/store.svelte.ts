@@ -168,7 +168,9 @@ class Store {
         kind: "dm",
         id: String(u.id),
         label: full.display_name || full.username,
-        sub: this.isOnline(full) ? "в сети" : "@" + full.username,
+        // Статус важнее @ника: «играю в X» полезнее, чем повтор имени,
+        // которое и так написано крупно. Ник оставляем, когда статус пуст.
+        sub: full.status?.trim() || (this.isOnline(full) ? "в сети" : "@" + full.username),
         user: full,
       });
     }
@@ -352,26 +354,52 @@ class Store {
     });
   }
 
-  /** Подставляет обновлённого меня во все карты: имя мелькает в шапке чата,
-   *  в списке людей и в сообщениях уже отправленных. */
-  private refreshUserNames(): void {
-    const me = this.me;
-    if (!me) return;
-    const map: Record<number, User> = { ...this.usersMap, [me.id]: { ...this.usersMap[me.id], ...me } };
-    // поправить и пользователей в списке
-    this.users = this.users.map((u) => (u.id === me.id ? { ...u, ...me } : u));
-    // и подписи в уже загруженной истории: сообщения хранят копию автора
+  /** Подставить обновлённого пользователя в кэш, список и историю. */
+  private applyUser(u: User): void {
+    const idx = this.users.findIndex((x) => x.id === u.id);
+    if (idx >= 0) {
+      const next = this.users.slice();
+      next[idx] = { ...next[idx], ...u };
+      this.users = next;
+    }
+    this.usersMap = { ...this.usersMap, [u.id]: { ...this.usersMap[u.id], ...u } };
+    // подпись автора хранится копией в каждом сообщении
     const msgs: Record<string, Msg[]> = {};
     for (const [key, list] of Object.entries(this.msgs)) {
       msgs[key] = list.map((m) => {
         const uid = m.user?.id ?? m.sender?.id;
-        if (uid !== me.id) return m;
-        const author = { ...(m.user ?? m.sender), ...me };
+        if (uid !== u.id) return m;
+        const author = { ...(m.user ?? m.sender), ...u };
         return { ...m, ...(m.user ? { user: author } : { sender: author }) };
       });
     }
     this.msgs = msgs;
-    this.usersMap = map;
+  }
+
+  /** Подставляет обновлённого меня во все карты: имя мелькает в шапке чата,
+   *  в списке людей и в сообщениях уже отправленных. */
+  private refreshUserNames(): void {
+    const me = this.me;
+    if (me) this.applyUser(me);
+  }
+
+  /** Сменить свой статус одним движением: текст, эмодзи — что угодно. */
+  async setMyStatus(status: string): Promise<void> {
+    const t = status.trim().slice(0, 100);
+    try {
+      await this.api.updateProfile({ status: t });
+      // сервер уже разослал presence_update, но своё значение знаем точно
+      if (this.me) {
+        const me = { ...this.me, status: t || null };
+        this.applyUser(me);
+        // и в localStorage: иначе после перезагрузки статус мигнёт старым,
+        // пока не ответит /api/me
+        this.me = me;
+        saveJson(LS.user, me);
+      }
+    } catch (e) {
+      this.noteMsg(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async loadData(): Promise<void> {    try {
@@ -493,6 +521,13 @@ class Store {
       case "screen_stop":
         this.calls?.handleEvent(ev);
         return;
+    }
+    if (ev.type === "presence_update" && ev.user) {
+      // Сменился статус, имя или аватарка. Подставляем в кэш и в список —
+      // иначе рядом с ником осталось бы старое значение до перезагрузки.
+      const u = ev.user as User;
+      this.applyUser(u);
+      return;
     }
     if (ev.type === "status") {
       if (ev.user_id == null) return;

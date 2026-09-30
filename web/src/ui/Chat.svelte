@@ -120,9 +120,23 @@
     </div>
     <div class="side-foot">
       <Avatar user={store.me} size={28} base={store.base} />
-      <button class="me-name" title="Настройки" onclick={() => (showSettings = true)}>
-        {store.me?.display_name || store.me?.username}
-      </button>
+      <div class="me-box">
+        <button class="me-name" title="Настройки" onclick={() => (showSettings = true)}>
+          {store.me?.display_name || store.me?.username}
+        </button>
+        <!-- свой статус меняется прямо тут: не нужно лезть в настройки,
+             чтобы сказать «играю во что-то» -->
+        <input
+          class="me-status"
+          value={store.me?.status ?? ""}
+          maxlength="100"
+          placeholder="что делаешь? например: играю в X"
+          onchange={(e) => store.setMyStatus((e.currentTarget as HTMLInputElement).value)}
+          onkeydown={(e) => {
+            if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+          }}
+        />
+      </div>
       <button class="icon-btn" title="Настройки" onclick={() => (showSettings = true)}>
         <Icon name="settings" size={16} />
       </button>
@@ -137,7 +151,13 @@
       {#if cur}
         <div class="chat-title">
           <span class="chan-chip">{cur.kind === "room" ? "#" : "@"}</span>
-          <span class="title-text">{cur.label.replace(/^[@#]\s*/, "")}</span>
+          <div class="title-box">
+            <span class="title-text">{cur.label.replace(/^[@#]\s*/, "")}</span>
+            {#if cur.kind === "dm" && store.usersMap[Number(cur.id)]?.status}
+              <!-- в шапке статус важнее: это то, за чем человек и открыл чат -->
+              <span class="title-status">{store.usersMap[Number(cur.id)]?.status}</span>
+            {/if}
+          </div>
           {#if cur.kind === "dm" && store.usersMap[Number(cur.id)]}
             <span class="online-dot" class:on={store.isOnline(store.usersMap[Number(cur.id)])}></span>
           {/if}
@@ -371,6 +391,36 @@
   .me-name:hover {
     background: var(--panel-hover);
   }
+  /* блок с ником и статусом: два ряда, чтобы статус не лез в кнопку настроек */
+  .me-box {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .me-status {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--muted);
+    text-overflow: ellipsis;
+  }
+  .me-status::placeholder {
+    color: var(--outline);
+  }
+  .me-status:hover {
+    background: var(--panel-hover);
+  }
+  .me-status:focus {
+    background: var(--surface);
+    color: var(--text1);
+  }
 
   /* ---------- чат ---------- */
   .chat {
@@ -441,6 +491,20 @@
   .title-text {
     font-size: 16px;
     font-weight: 600;
+  }
+  .title-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+  }
+  .title-status {
+    font-size: 12.5px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 420px;
   }
   .note-bar {
     margin: 8px 16px 0;
