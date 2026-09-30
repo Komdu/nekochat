@@ -32,6 +32,17 @@ export const CHUNK = 64 * 1024;
 /** Файл живёт 5 минут, потом отправка обрывается сама. */
 export const TRANSFER_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Потолок на размер файла — 512 МБ.
+ *
+ * Явного лимита раньше не было нигде: ни клиент, ни сервер не проверяли
+ * общий объём, единственным ограничением был таймер. На практике за 5 минут
+ * по туннелю уходит сотня мегабайт, так что 512 МБ — это потолок запаса, а
+ * не рабочее число. Ставится именно с той стороны, где память: получатель
+ * держит все куски до сборки блоба, и больше никакого потолка не было.
+ */
+export const MAX_FILE = 512 * 1024 * 1024;
+
 const FLAG_ROOM = 1 << 0;
 const FLAG_LAST = 1 << 1;
 const STREAM_MASK = 0x3fff;
@@ -139,6 +150,18 @@ export class FileManager {
     };
 
     const flagsBase = (target.roomId ? FLAG_ROOM : 0) | (stream << STREAM_SHIFT);
+
+    // Размер проверяем ДО гонки: бессмысленно пять минут резать файл, который
+    // всё равно не влезет. И заодно предупреждаем, если он заведомо не
+    // пройдёт за отведённое время.
+    if (file.size > MAX_FILE) {
+      t.state = "error";
+      t.error = `файл ${fmtSize(file.size)} больше предела ${fmtSize(MAX_FILE)}`;
+      onChange(t);
+      onDone(t);
+      return t;
+    }
+
     // Ждём канал: поднимаем, если закрыт, и даём ему до 3 с на CONNECTING.
     if (!(await this.waitChannel(ready, open, 3000))) {
       t.state = "error";
@@ -281,6 +304,19 @@ export class FileManager {
     if (!rec) {
       const parsed = parseFirstPayload(payload);
       if (!parsed) return; // битый кадр — молча, иначе разорвём поток
+      // Потолок на объявленный размер. Без него отправитель, объявивший
+      // 10 байт, мог лить бы в нашу память, пока не кончится браузер:
+      // куски лежат в массиве до момента сборки блоба.
+      if (parsed.meta.s > MAX_FILE) {
+        onNew({
+          key, dir: "in", stream,
+          name: parsed.meta.n, size: parsed.meta.s, mime: parsed.meta.t,
+          state: "error",
+          error: `файл больше ${humanSize(MAX_FILE)} — не беру`,
+          progress: 0, peerId: from, startedAt: Date.now(),
+        });
+        return;
+      }
       rec = { meta: parsed.meta, parts: [], got: 0, peerId: from };
       this.incoming.set(key, rec);
       if (parsed.head.length) {
@@ -300,6 +336,20 @@ export class FileManager {
         startedAt: Date.now(),
       });
     } else {
+      // Принято не должно превышать объявленное: иначе отправитель может
+      // лить бесконечно, а таймер на его стороне нас не защищает. Превышение
+      // — обрыв с освобождением памяти, а не «продолжим как есть».
+      if (rec.got + payload.length > rec.meta.s) {
+        this.incoming.delete(key);
+        onNew({
+          key, dir: "in", stream,
+          name: rec.meta.n, size: rec.meta.s, mime: rec.meta.t,
+          state: "error",
+          error: "пришло больше байт, чем объявлено — передача прервана",
+          progress: 0, peerId: from, startedAt: Date.now(),
+        });
+        return;
+      }
       rec.parts.push(payload.slice());
       rec.got += payload.length;
     }
